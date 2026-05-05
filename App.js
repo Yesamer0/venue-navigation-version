@@ -1,93 +1,140 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, Text, View, ActivityIndicator } from 'react-native';
-import { supabase } from './supabaseClient'; // Oluşturduğun bağlantı dosyası
+// TouchableOpacity buraya eklendi!
+import { StyleSheet, Text, View, FlatList, Image, SafeAreaView, ActivityIndicator, TouchableOpacity } from 'react-native'; 
+import { supabase } from './supabaseClient'; 
+import { styles } from './styles'; // Bu satırı ekle
+
 
 export default function App() {
-  const [status, setStatus] = useState("Bağlanıyor...");
+  const categories = ['Hepsi', 'Kafe', 'Restoran', 'Bar', 'Etkinlik']; 
+  const [venues, setVenues] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedCategory, setSelectedCategory] = useState('Hepsi'); 
 
+  const handleCategoryChange = (category) => {
+  setLoading(true); // Yükleme animasyonunu (pembe halka) başlatır
+  setSelectedCategory(category); // Seçilen kategoriyi günceller
+  
+  // Yarım saniye (500ms) bekle ve yüklemeyi durdur
+  setTimeout(() => {
+    setLoading(false);
+  }, 500);
+};
+  
   useEffect(() => {
-    async function checkSupabaseConnection() {
+    async function fetchVenues() {
       try {
-        // image_b292e1.png dosyasındaki 'venues' tablosunu test ediyoruz
-        const { data, error } = await supabase.from('venues').select('*').limit(1);
+        setLoading(true);
+        const { data, error } = await supabase.from('venues').select('*');
         
         if (error) {
-          setStatus("Hata: " + error.message);
+          console.error("Supabase Hatası:", error.message);
         } else {
-          setStatus("Venue: Supabase Bağlantısı Başarılı!");
-          console.log("Veritabanından gelen veri örneği:", data);
+          setVenues(data);
         }
       } catch (err) {
-        setStatus("Beklenmedik bir hata oluştu.");
+        console.error("Beklenmedik Hata:", err);
       } finally {
         setLoading(false);
       }
     }
-
-    checkSupabaseConnection();
+    fetchVenues();
   }, []);
 
-  return (
-    <View style={styles.container}>
-      <Text style={styles.header}>VENUE</Text>
+  // Filtreleme mantığı: Eğer 'Hepsi' seçiliyse her şeyi göster, değilse sadece o kategoriyi süz.
+  const filteredVenues = selectedCategory === 'Hepsi' 
+    ? venues 
+    : venues.filter(v => v.category === selectedCategory);
+
+  const renderItem = ({ item }) => (
+    <TouchableOpacity 
+      style={styles.card} 
+      onPress={() => alert(`${item.name} detayları yakında!`)}
+    >
+      {/* Görsel */}
+      <Image 
+        source={{ uri: item.image_url || 'https://via.placeholder.com/150' }} 
+        style={styles.image} 
+      />
       
-      {loading ? (
-        <ActivityIndicator size="large" color="#FFB7C5" />
-      ) : (
-        <View style={styles.statusBox}>
-          <Text style={status.includes("Başarılı") ? styles.successText : styles.errorText}>
-            {status}
-          </Text>
+      {/* Kategori Rozeti (Görselin üzerinde sol üstte) */}
+      <View style={styles.categoryBadge}>
+        <Text style={styles.categoryBadgeText}>{item.category}</Text>
+      </View>
+
+      <View style={styles.cardContent}>
+        {/* Üst Satır: İsim ve Fiyat */}
+        <View style={styles.row}>
+          <Text style={styles.venueName} numberOfLines={1}>{item.name}</Text>
+          <Text style={styles.priceText}>{item.price_level || '₺₺'}</Text>
         </View>
-      )}
-
-      <Text style={styles.footer}>8 Aylık Proje Süreci: 4. Gün Tamamlanıyor</Text>
-    </View>
+        
+        {/* Alt Satır: Konum ve Yıldız Puanı */}
+        <View style={styles.row}>
+          <Text style={styles.venueLocation} numberOfLines={1}>{item.location}</Text>
+          <View style={styles.ratingBadge}>
+            <Text style={styles.ratingText}>⭐ {item.rating || '0.0'}</Text>
+          </View>
+        </View>
+      </View>
+    </TouchableOpacity>
   );
-}
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FFF5F5', // programarayüz.jpeg'deki pastel tonlara uygun
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
-  },
-  header: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#D8A7B1', // Misty Rose tonu
-    marginBottom: 20,
-    letterSpacing: 2,
-  },
-  statusBox: {
-    padding: 20,
-    borderRadius: 15,
-    backgroundColor: '#fff',
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  successText: {
-    color: '#4CAF50',
-    fontSize: 18,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  errorText: {
-    color: '#F44336',
-    fontSize: 18,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  footer: {
-    position: 'absolute',
-    bottom: 40,
-    fontSize: 12,
-    color: '#999',
-  },
-});
+  return (
+    <SafeAreaView style={styles.container}>
+      {/* Başlık Bölümü */}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Nereye gitsek?</Text>
+      </View>
+
+      {/* Yatay Kategori Listesi */}
+      <View style={styles.categoryContainer}>
+        <FlatList
+          horizontal 
+          showsHorizontalScrollIndicator={false} 
+          data={categories}
+          keyExtractor={(item) => item}
+          renderItem={({ item }) => (
+            <TouchableOpacity 
+              style={[
+                styles.categoryButton, 
+                selectedCategory === item && styles.selectedCategoryButton 
+              ]}
+              onPress={() => handleCategoryChange(item)}
+            >
+              <Text style={[
+                styles.categoryText, 
+                selectedCategory === item && styles.selectedCategoryText
+              ]}>
+                {item}
+              </Text>
+            </TouchableOpacity>
+          )}
+        />
+      </View>
+
+      {/* Yükleme Ekranı, Boş Durum veya Ana Liste */}
+      {loading ? (
+        <ActivityIndicator size="large" color="#D8A7B1" style={{ marginTop: 50 }} />
+      ) : filteredVenues.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <Text style={{ fontSize: 50, marginBottom: 20 }}>🌸</Text> 
+          <Text style={styles.emptyText}>Bu kategoride henüz mekan keşfedilmedi.</Text>
+          <TouchableOpacity 
+            style={styles.allButton} 
+            onPress={() => handleCategoryChange('Hepsi')}
+          >
+            <Text style={styles.allButtonText}>Tüm Mekanları Gör</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <FlatList
+          data={filteredVenues}
+          renderItem={renderItem}
+          keyExtractor={item => item.id.toString()}
+          contentContainerStyle={styles.list}
+        />
+      )}
+    </SafeAreaView>
+  );}
+
