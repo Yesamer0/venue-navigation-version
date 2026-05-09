@@ -1,8 +1,6 @@
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
-
-// Dosyaları doğru yollardan çağırıyoruz
 import HomeScreen from './HomeScreen';
 import DetailsScreen from './DetailsScreen';
 
@@ -14,20 +12,20 @@ export default function App() {
       <Stack.Navigator 
         initialRouteName="Home"
         screenOptions={{
-          headerTintColor: '#D8A7B1',
+          headerStyle: { backgroundColor: '#fff' },
+          headerTintColor: '#D8A7B1', // Pembe tonu
           headerTitleStyle: { fontWeight: 'bold' },
         }}
       >
-        {/* İşte burası HomeScreen'i devreye sokacak satır */}
         <Stack.Screen 
           name="Home" 
           component={HomeScreen} 
-          options={{ title: 'Venue Keşfet' }} 
+          options={{ headerShown: false }} 
         />
         <Stack.Screen 
           name="Details" 
           component={DetailsScreen} 
-          options={{ title: 'Mekan Detayı' }} 
+          options={{ title: 'Mekan Detayı' }}
         />
       </Stack.Navigator>
     </NavigationContainer>
