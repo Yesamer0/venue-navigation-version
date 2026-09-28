@@ -37,6 +37,10 @@ const [collections, setCollections] = useState([]);
 const [newCollectionName, setNewCollectionName] = useState('');
 const [loadingCollections, setLoadingCollections] = useState(false);
 
+const [selectedCollection, setSelectedCollection] = useState(null);
+const [collectionVenues, setCollectionVenues] = useState([]);
+const [loadingCollectionVenues, setLoadingCollectionVenues] = useState(false);
+
   const [posts, setPosts] = useState([
     { id: '1', text: 'Bugün harika bir kahve mekanı keşfettim! ☕✨', location: 'Kadıköy Kahvecisi', time: '2 saat önce', image: null },
     { id: '2', text: 'Venue uygulamasının arayüzü çok tatlı oldu, burası tam benlik.', location: '', time: 'Dün', image: null }
@@ -115,6 +119,44 @@ const fetchCollections = async (userId) => {
     console.log('Koleksiyon yükleme hatası:', err);
   } finally {
     setLoadingCollections(false);
+  }
+};
+
+const fetchCollectionVenues = async (collection) => {
+  setSelectedCollection(collection);
+  setLoadingCollectionVenues(true);
+
+  try {
+    const { data, error } = await supabase
+      .from('collection_venues')
+      .select(`
+        id,
+        venue_id,
+        venues (*)
+      `)
+      .eq('collection_id', collection.id)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.log(
+        'Koleksiyon mekanları çekilemedi:',
+        JSON.stringify(error, null, 2)
+      );
+      return;
+    }
+
+    const venues = (data || [])
+      .map((item) => item.venues)
+      .filter(Boolean);
+
+    console.log('KOLEKSIYON VENUES:', JSON.stringify(venues, null, 2));
+
+    setCollectionVenues(venues);
+
+  } catch (err) {
+    console.log('Koleksiyon mekanları yükleme hatası:', err);
+  } finally {
+    setLoadingCollectionVenues(false);
   }
 };
 
@@ -387,6 +429,7 @@ const handleCreateCollection = async () => {
       {collections.map((collection) => (
         <TouchableOpacity
           key={collection.id}
+          onPress={() => fetchCollectionVenues(collection)}
           style={styles.collectionCard}
         >
           <Text style={styles.collectionIcon}>📁</Text>
@@ -401,7 +444,92 @@ const handleCreateCollection = async () => {
       ))}
     </ScrollView>
   )}
+{/* Seçilen Koleksiyonun İçindeki Mekanlar */}
+{selectedCollection && (
+  <View style={{ marginTop: 15 }}>
+    <Text
+      style={{
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#DB7093',
+        marginBottom: 10,
+      }}
+    >
+      📁 {selectedCollection.name}
+    </Text>
 
+    {loadingCollectionVenues ? (
+      <ActivityIndicator
+        size="small"
+        color="#FF69B4"
+      />
+    ) : collectionVenues.length === 0 ? (
+      <Text
+        style={{
+          color: '#999',
+          fontSize: 13,
+        }}
+      >
+        Bu koleksiyonda henüz mekan yok.
+      </Text>
+    ) : (
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+      >
+        {collectionVenues.map((venue) => (
+          <TouchableOpacity
+            key={venue.id}
+            onPress={() =>
+              navigation.navigate('Details', {
+                item: venue,
+              })
+            }
+            style={{
+              width: 130,
+              marginRight: 10,
+              backgroundColor: '#FFF0F5',
+              borderRadius: 12,
+              overflow: 'hidden',
+            }}
+          >
+            <Image
+              source={{ uri: venue.image_url }}
+              style={{
+                width: '100%',
+                height: 90,
+              }}
+            />
+
+            <View style={{ padding: 8 }}>
+              <Text
+                numberOfLines={1}
+                style={{
+                  fontWeight: 'bold',
+                  color: '#DB7093',
+                  fontSize: 13,
+                }}
+              >
+                {venue.name}
+              </Text>
+
+              <Text
+                numberOfLines={1}
+                style={{
+                  color: '#777',
+                  fontSize: 11,
+                  marginTop: 2,
+                }}
+              >
+                {venue.location}
+              </Text>
+            </View>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+    )}
+  </View>
+)}
 </View>
 
       {/* Orta Kısım: Gelişmiş Paylaşım Kutusu */}

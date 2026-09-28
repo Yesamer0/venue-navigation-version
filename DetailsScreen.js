@@ -46,12 +46,11 @@ export default function DetailsScreen({ route, navigation }) {
 
   const [activeMainTab, setActiveMainTab] = useState('menu');
   const [activeMenuGroup, setActiveMenuGroup] = useState('yiyecek');
-  
+
   // --- Koleksiyonlar ---
   const [collections, setCollections] = useState([]);
-  const [newCollectionName, setNewCollectionName] = useState('');
+  const [showCollections, setShowCollections] = useState(false);
   const [loadingCollections, setLoadingCollections] = useState(false);
-
 
   // --- Canlı Durum ---
   const [liveCount, setLiveCount] = useState(0);
@@ -133,99 +132,158 @@ export default function DetailsScreen({ route, navigation }) {
         .maybeSingle();
 
       setCurrentUser({ id: authUser.id, username: profile?.username || 'Gezgin' });
-setIsOwner(item.owner_id === authUser.id);
+      setIsOwner(item.owner_id === authUser.id);
 
-// Kullanıcının bu mekanı daha önce favorileyip favorilemediğini kontrol et
-await fetchFavoriteStatus(authUser.id);
-
-} catch (err) {
-  console.log('Kullanıcı bilgisi alınamadı:', err);
-}
-};
-
-const fetchFavoriteStatus = async (userId) => {
-  try {
-    const { data, error } = await supabase
-      .from('favorites')
-      .select('id')
-      .eq('user_id', userId)
-      .eq('venue_id', item.id)
-      .maybeSingle();
-
-    if (error) {
-      console.log('Favori kontrol hatası:', error);
-      return;
+      // Kullanıcının bu mekanı daha önce favorileyip favorilemediğini kontrol et
+      await fetchFavoriteStatus(authUser.id);
+      await fetchCollections(authUser.id);
+    } catch (err) {
+      console.log('Kullanıcı bilgisi alınamadı:', err);
     }
+  };
 
-    if (data) {
-      setIsFavorite(true);
-      setFavoriteId(data.id);
-    } else {
-      setIsFavorite(false);
-      setFavoriteId(null);
+  const fetchFavoriteStatus = async (userId) => {
+    try {
+      const { data, error } = await supabase
+        .from('favorites')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('venue_id', item.id)
+        .maybeSingle();
+
+      if (error) {
+        console.log('Favori kontrol hatası:', error);
+        return;
+      }
+
+      if (data) {
+        setIsFavorite(true);
+        setFavoriteId(data.id);
+      } else {
+        setIsFavorite(false);
+        setFavoriteId(null);
+      }
+    } catch (err) {
+      console.log('Favori kontrol hatası:', err);
     }
-  } catch (err) {
-    console.log('Favori kontrol hatası:', err);
-  }
-};
+  };
 
-const handleToggleFavorite = async () => {
+  const fetchCollections = async (userId) => {
+    setLoadingCollections(true);
+
+    try {
+      const { data, error } = await supabase
+        .from('collections')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.log('Koleksiyonlar çekilemedi:', JSON.stringify(error, null, 2));
+        return;
+      }
+
+      setCollections(data || []);
+    } catch (err) {
+      console.log('Koleksiyon yükleme hatası:', err);
+    } finally {
+      setLoadingCollections(false);
+    }
+  };
+  const handleAddToCollection = async (collectionId) => {
   if (!currentUser) {
-    alert('Favorilere eklemek için giriş yapmalısınız.');
+    alert('Koleksiyona eklemek için giriş yapmalısınız.');
     return;
   }
 
-  if (loadingFavorite) return;
-
-  setLoadingFavorite(true);
-
   try {
-    if (isFavorite) {
-      // Zaten favorideyse favorilerden çıkar
-      const { error } = await supabase
-        .from('favorites')
-        .delete()
-        .eq('id', favoriteId);
+    const { error } = await supabase
+      .from('collection_venues')
+      .insert([
+        {
+          collection_id: collectionId,
+          venue_id: item.id,
+        },
+      ]);
 
-      if (error) {
-        console.log('Favori silme hatası:', error);
-        alert('Favoriden çıkarılırken bir hata oluştu.');
-        return;
+    if (error) {
+      if (error.code === '23505') {
+        alert('Bu mekan zaten bu koleksiyonda.');
+      } else {
+        console.log(
+          'Koleksiyona ekleme hatası:',
+          JSON.stringify(error, null, 2)
+        );
+
+        alert('Mekan koleksiyona eklenemedi.');
       }
 
-      setIsFavorite(false);
-      setFavoriteId(null);
-
-    } else {
-      // Favoride değilse favorilere ekle
-      const { data, error } = await supabase
-        .from('favorites')
-        .insert([
-          {
-            user_id: currentUser.id,
-            venue_id: item.id,
-          },
-        ])
-        .select('id')
-        .single();
-
-      if (error) {
-        console.log('Favori ekleme hatası:', error);
-        alert('Favorilere eklenirken bir hata oluştu.');
-        return;
-      }
-
-      setIsFavorite(true);
-      setFavoriteId(data.id);
+      return;
     }
+
+    setShowCollections(false);
+    alert('Mekan koleksiyona eklendi.');
+
   } catch (err) {
-    console.log('Favori işlem hatası:', err);
-    alert('Bir bağlantı sorunu oluştu.');
-  } finally {
-    setLoadingFavorite(false);
+    console.log('Koleksiyona ekleme hatası:', err);
   }
 };
 
+  const handleToggleFavorite = async () => {
+    if (!currentUser) {
+      alert('Favorilere eklemek için giriş yapmalısınız.');
+      return;
+    }
+
+    if (loadingFavorite) return;
+
+    setLoadingFavorite(true);
+
+    try {
+      if (isFavorite) {
+        // Zaten favorideyse favorilerden çıkar
+        const { error } = await supabase
+          .from('favorites')
+          .delete()
+          .eq('id', favoriteId);
+
+        if (error) {
+          console.log('Favori silme hatası:', error);
+          alert('Favoriden çıkarılırken bir hata oluştu.');
+          return;
+        }
+
+        setIsFavorite(false);
+        setFavoriteId(null);
+      } else {
+        // Favoride değilse favorilere ekle
+        const { data, error } = await supabase
+          .from('favorites')
+          .insert([
+            {
+              user_id: currentUser.id,
+              venue_id: item.id,
+            },
+          ])
+          .select('id')
+          .single();
+
+        if (error) {
+          console.log('Favori ekleme hatası:', error);
+          alert('Favorilere eklenirken bir hata oluştu.');
+          return;
+        }
+
+        setIsFavorite(true);
+        setFavoriteId(data.id);
+      }
+    } catch (err) {
+      console.log('Favori işlem hatası:', err);
+      alert('Bir bağlantı sorunu oluştu.');
+    } finally {
+      setLoadingFavorite(false);
+    }
+  };
 
   const fetchLiveCount = async () => {
     setLoadingLiveCount(true);
@@ -623,9 +681,9 @@ const handleToggleFavorite = async () => {
       >
         <View style={{ flex: 1 }}>
           <Text style={{ fontSize: 15, fontWeight: '600', color: '#333' }}>{menuItem.name}</Text>
-          {menuItem.description && (
+          {menuItem.description ? (
             <Text style={{ fontSize: 12, color: '#777', marginTop: 2 }}>{menuItem.description}</Text>
-          )}
+          ) : null}
         </View>
 
         {menuItem.price != null && (
@@ -652,53 +710,138 @@ const handleToggleFavorite = async () => {
     <ScrollView style={{ height: SCREEN_HEIGHT, backgroundColor: '#fff' }} contentContainerStyle={{ paddingBottom: 40 }}>
       {/* ===== ÜST KISIM ===== */}
       <View>
-  <Image source={{ uri: item.image_url }} style={{ width: '100%', height: 180 }} />
+        <Image source={{ uri: item.image_url }} style={{ width: '100%', height: 180 }} />
 
-  {/* Geri butonu */}
-  <TouchableOpacity
-    onPress={() => navigation.goBack()}
-    style={{
-      position: 'absolute', top: 15, left: 15,
-      width: 38, height: 38, borderRadius: 19,
-      backgroundColor: 'rgba(0,0,0,0.45)',
-      justifyContent: 'center', alignItems: 'center',
-    }}
-  >
-    <Text style={{ color: '#fff', fontSize: 18, fontWeight: 'bold' }}>‹</Text>
-  </TouchableOpacity>
+        {/* Geri butonu */}
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={{
+            position: 'absolute', top: 15, left: 15,
+            width: 38, height: 38, borderRadius: 19,
+            backgroundColor: 'rgba(0,0,0,0.45)',
+            justifyContent: 'center', alignItems: 'center',
+          }}
+        >
+          <Text style={{ color: '#fff', fontSize: 18, fontWeight: 'bold' }}>‹</Text>
+        </TouchableOpacity>
 
-  {/* Favori butonu */}
-  <TouchableOpacity
-    onPress={handleToggleFavorite}
-    disabled={loadingFavorite}
-    style={{
-      position: 'absolute',
-      top: 15,
-      right: 15,
-      width: 38,
-      height: 38,
-      borderRadius: 19,
-      backgroundColor: 'rgba(0,0,0,0.45)',
-      justifyContent: 'center',
-      alignItems: 'center',
-    }}
-  >
-    {loadingFavorite ? (
-      <ActivityIndicator color="#fff" size="small" />
-    ) : (
-      <Text
-        style={{
-          color: isFavorite ? '#FF69B4' : '#fff',
-          fontSize: 23,
-          fontWeight: 'bold',
-        }}
-      >
-        {isFavorite ? '♥' : '♡'}
-      </Text>
-    )}
-  </TouchableOpacity>
-</View>
+        {/* Favori butonu */}
+        <TouchableOpacity
+          onPress={handleToggleFavorite}
+          disabled={loadingFavorite}
+          style={{
+            position: 'absolute',
+            top: 15,
+            right: 15,
+            width: 38,
+            height: 38,
+            borderRadius: 19,
+            backgroundColor: 'rgba(0,0,0,0.45)',
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}
+        >
+          {loadingFavorite ? (
+            <ActivityIndicator color="#fff" size="small" />
+          ) : (
+            <Text
+              style={{
+                color: isFavorite ? '#FF69B4' : '#fff',
+                fontSize: 23,
+                fontWeight: 'bold',
+              }}
+            >
+              {isFavorite ? '♥' : '♡'}
+            </Text>
+          )}
+        </TouchableOpacity>
 
+        {/* 📁 Koleksiyona Kaydet Butonu */}
+        <TouchableOpacity
+          onPress={() => setShowCollections(!showCollections)}
+          style={{
+            position: 'absolute',
+            top: 60,
+            right: 15,
+            backgroundColor: 'rgba(0,0,0,0.45)',
+            paddingVertical: 8,
+            paddingHorizontal: 12,
+            borderRadius: 18,
+          }}
+        >
+          <Text
+            style={{
+              color: '#fff',
+              fontSize: 12,
+              fontWeight: '600',
+            }}
+          >
+            📁 Koleksiyona Kaydet
+          </Text>
+        </TouchableOpacity>
+
+        {/* 📁 Açılan Koleksiyon Listesi */}
+        {showCollections && (
+          <View
+            style={{
+              position: 'absolute',
+              top: 105,
+              right: 15,
+              width: 190,
+              backgroundColor: '#fff',
+              borderRadius: 12,
+              padding: 10,
+              zIndex: 20,
+              elevation: 5,
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 13,
+                fontWeight: 'bold',
+                color: '#DB7093',
+                marginBottom: 8,
+              }}
+            >
+              Koleksiyon Seç
+            </Text>
+
+            {loadingCollections ? (
+              <ActivityIndicator size="small" color="#FF69B4" />
+            ) : collections.length === 0 ? (
+              <Text style={{ fontSize: 12, color: '#999' }}>
+                Henüz koleksiyonun yok.
+              </Text>
+            ) : (
+              collections.map((collection) => (
+                <TouchableOpacity
+                  key={collection.id}
+                  onPress={() => handleAddToCollection(collection.id)}
+                  style={{
+                    backgroundColor: '#FFF0F5',
+                    paddingVertical: 9,
+                    paddingHorizontal: 10,
+                    borderRadius: 8,
+                    marginBottom: 6,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: '#DB7093',
+                      fontSize: 12,
+                      fontWeight: '600',
+                    }}
+                  >
+                    📁 {collection.name}
+                  </Text>
+                </TouchableOpacity>
+              ))
+            )}
+          </View>
+        )}
+      </View>
+
+      {/* ===== BAŞLIK BÖLÜMÜ ===== */}
       <View style={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 8 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <View style={{ flex: 1 }}>
@@ -1046,24 +1189,66 @@ const handleToggleFavorite = async () => {
           {loadingPhotos ? (
             <ActivityIndicator color="#FF69B4" style={{ marginVertical: 20 }} />
           ) : taggedPhotos.length === 0 ? (
-            <Text style={{ color: '#999', marginBottom: 20 }}>Henüz kimse etiketlememiş.</Text>
+            <Text style={{ color: '#999', marginBottom: 20 }}>
+              Henüz kimse etiketlememiş.
+            </Text>
           ) : (
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 20, marginHorizontal: -2 }}>
+            <View
+              style={{
+                flexDirection: 'row',
+                flexWrap: 'wrap',
+                marginBottom: 20,
+                marginHorizontal: -2,
+              }}
+            >
               {taggedPhotos.map((photo) => {
                 const isMyPhoto = currentUser && currentUser.id === photo.user_id;
+
                 return (
-                  <View key={photo.id} style={{ width: '33.33%', padding: 2 }}>
-                    <TouchableOpacity onPress={() => isMyPhoto && startEditPhoto(photo)} activeOpacity={isMyPhoto ? 0.7 : 1}>
-                      <Image source={{ uri: photo.image_url }} style={{ width: '100%', aspectRatio: 1, borderRadius: 6 }} />
+                  <View
+                    key={photo.id}
+                    style={{
+                      width: '33.33%',
+                      padding: 2,
+                    }}
+                  >
+                    <TouchableOpacity
+                      onPress={() => isMyPhoto && startEditPhoto(photo)}
+                      activeOpacity={isMyPhoto ? 0.7 : 1}
+                    >
+                      <Image
+                        source={{ uri: photo.image_url }}
+                        style={{
+                          width: '100%',
+                          aspectRatio: 1,
+                          borderRadius: 6,
+                        }}
+                      />
+
                       {isMyPhoto && (
                         <TouchableOpacity
                           style={{
-                            position: 'absolute', top: 4, right: 4, backgroundColor: 'rgba(0,0,0,0.6)',
-                            width: 20, height: 20, borderRadius: 10, justifyContent: 'center', alignItems: 'center',
+                            position: 'absolute',
+                            top: 4,
+                            right: 4,
+                            backgroundColor: 'rgba(0,0,0,0.6)',
+                            width: 20,
+                            height: 20,
+                            borderRadius: 10,
+                            justifyContent: 'center',
+                            alignItems: 'center',
                           }}
                           onPress={() => handleDeletePhoto(photo.id)}
                         >
-                          <Text style={{ color: '#fff', fontSize: 11, fontWeight: 'bold' }}>✕</Text>
+                          <Text
+                            style={{
+                              color: '#fff',
+                              fontSize: 11,
+                              fontWeight: 'bold',
+                            }}
+                          >
+                            ✕
+                          </Text>
                         </TouchableOpacity>
                       )}
                     </TouchableOpacity>
