@@ -28,19 +28,62 @@ export default function ProfileScreen({ navigation }) {
   const [nearbyVenues, setNearbyVenues] = useState([]);
   const [loadingLocation, setLoadingLocation] = useState(false);
 
+  // --- Favori Mekanlar ---
+  const [favoriteVenues, setFavoriteVenues] = useState([]);
+  const [loadingFavorites, setLoadingFavorites] = useState(true);
+
+
   const [posts, setPosts] = useState([
     { id: '1', text: 'Bugün harika bir kahve mekanı keşfettim! ☕✨', location: 'Kadıköy Kahvecisi', time: '2 saat önce', image: null },
     { id: '2', text: 'Venue uygulamasının arayüzü çok tatlı oldu, burası tam benlik.', location: '', time: 'Dün', image: null }
   ]);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      if (data?.user) {
-        const currentUsername = data.user.user_metadata?.username || data.user.email.split('@')[0];
-        setUsername(currentUsername);
-      }
-    }).catch(err => console.log(err));
-  }, []);
+  supabase.auth.getUser().then(({ data }) => {
+    if (data?.user) {
+      const currentUsername =
+        data.user.user_metadata?.username ||
+        data.user.email.split('@')[0];
+
+      setUsername(currentUsername);
+
+      // Kullanıcının favori mekanlarını getir
+      fetchFavoriteVenues(data.user.id);
+    }
+  }).catch(err => console.log(err));
+}, []);
+
+const fetchFavoriteVenues = async (userId) => {
+  setLoadingFavorites(true);
+
+  try {
+    const { data, error } = await supabase
+      .from('favorites')
+      .select(`
+        id,
+        venue_id,
+        venues (*)
+      `)
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.log('Favoriler çekilemedi:', error);
+      return;
+    }
+
+    const venues = (data || [])
+      .map((favorite) => favorite.venues)
+      .filter(Boolean);
+
+    setFavoriteVenues(venues);
+
+  } catch (err) {
+    console.log('Favoriler yüklenirken hata:', err);
+  } finally {
+    setLoadingFavorites(false);
+  }
+};
 
   // EKLENDİ: Galeriden fotoğraf seçme fonksiyonu
   const pickImage = async () => {
@@ -152,6 +195,77 @@ export default function ProfileScreen({ navigation }) {
           <Text style={styles.miniSignOutText}>Çıkış</Text>
         </TouchableOpacity>
       </View>
+
+
+
+      {/* Favori Mekanlar */}
+<View style={styles.favoritesContainer}>
+
+  <Text style={styles.favoritesTitle}>
+    ❤️ Favori Mekanlarım
+  </Text>
+
+  {loadingFavorites ? (
+
+    <ActivityIndicator
+      size="small"
+      color="#FF69B4"
+      style={{ marginVertical: 15 }}
+    />
+
+  ) : favoriteVenues.length === 0 ? (
+
+    <Text style={styles.emptyFavoritesText}>
+      Henüz favori mekanın yok.
+    </Text>
+
+  ) : (
+
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+    >
+      {favoriteVenues.map((venue) => (
+
+        <TouchableOpacity
+          key={venue.id}
+          style={styles.favoriteCard}
+          onPress={() =>
+            navigation.navigate('Details', { item: venue })
+          }
+        >
+
+          <Image
+            source={{ uri: venue.image_url }}
+            style={styles.favoriteImage}
+          />
+
+          <View style={styles.favoriteInfo}>
+
+            <Text
+              style={styles.favoriteName}
+              numberOfLines={1}
+            >
+              {venue.name}
+            </Text>
+
+            <Text
+              style={styles.favoriteLocation}
+              numberOfLines={1}
+            >
+              📍 {venue.location}
+            </Text>
+
+          </View>
+
+        </TouchableOpacity>
+
+      ))}
+    </ScrollView>
+
+  )}
+
+</View>
 
       {/* Orta Kısım: Gelişmiş Paylaşım Kutusu */}
       <View style={styles.shareContainer}>
@@ -470,4 +584,56 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
   },
+
+  favoritesContainer: {
+  backgroundColor: '#fff',
+  marginHorizontal: 15,
+  marginTop: 15,
+  borderRadius: 16,
+  padding: 15,
+},
+
+favoritesTitle: {
+  fontSize: 16,
+  fontWeight: 'bold',
+  color: '#DB7093',
+  marginBottom: 12,
+},
+
+emptyFavoritesText: {
+  fontSize: 13,
+  color: '#aaa',
+  paddingVertical: 10,
+},
+
+favoriteCard: {
+  width: 145,
+  backgroundColor: '#FFF0F5',
+  borderRadius: 12,
+  marginRight: 10,
+  overflow: 'hidden',
+  borderWidth: 1,
+  borderColor: '#FFE4E1',
+},
+
+favoriteImage: {
+  width: '100%',
+  height: 90,
+},
+
+favoriteInfo: {
+  padding: 9,
+},
+
+favoriteName: {
+  fontSize: 14,
+  fontWeight: 'bold',
+  color: '#333',
+},
+
+favoriteLocation: {
+  fontSize: 11,
+  color: '#DB7093',
+  marginTop: 4,
+},
 });
