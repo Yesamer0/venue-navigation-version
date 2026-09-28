@@ -31,7 +31,11 @@ export default function ProfileScreen({ navigation }) {
   // --- Favori Mekanlar ---
   const [favoriteVenues, setFavoriteVenues] = useState([]);
   const [loadingFavorites, setLoadingFavorites] = useState(true);
-
+  
+  // --- Koleksiyonlar ---
+const [collections, setCollections] = useState([]);
+const [newCollectionName, setNewCollectionName] = useState('');
+const [loadingCollections, setLoadingCollections] = useState(false);
 
   const [posts, setPosts] = useState([
     { id: '1', text: 'Bugün harika bir kahve mekanı keşfettim! ☕✨', location: 'Kadıköy Kahvecisi', time: '2 saat önce', image: null },
@@ -49,6 +53,7 @@ export default function ProfileScreen({ navigation }) {
 
       // Kullanıcının favori mekanlarını getir
       fetchFavoriteVenues(data.user.id);
+      fetchCollections(data.user.id);
     }
   }).catch(err => console.log(err));
 }, []);
@@ -82,6 +87,76 @@ const fetchFavoriteVenues = async (userId) => {
     console.log('Favoriler yüklenirken hata:', err);
   } finally {
     setLoadingFavorites(false);
+  }
+};
+
+
+const fetchCollections = async (userId) => {
+  setLoadingCollections(true);
+
+  try {
+    const { data, error } = await supabase
+      .from('collections')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.log(
+  'Koleksiyonlar çekilemedi:',
+  JSON.stringify(error, null, 2)
+);
+      return;
+    }
+
+    setCollections(data || []);
+
+  } catch (err) {
+    console.log('Koleksiyon yükleme hatası:', err);
+  } finally {
+    setLoadingCollections(false);
+  }
+};
+
+
+const handleCreateCollection = async () => {
+  const name = newCollectionName.trim();
+
+  if (!name) {
+    alert('Koleksiyon adı yazmalısınız.');
+    return;
+  }
+
+  try {
+    const { data: authData } = await supabase.auth.getUser();
+
+    if (!authData?.user) {
+      alert('Koleksiyon oluşturmak için giriş yapmalısınız.');
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from('collections')
+      .insert([
+        {
+          user_id: authData.user.id,
+          name: name,
+        },
+      ])
+      .select()
+      .single();
+
+    if (error) {
+      console.log('Koleksiyon oluşturma hatası:', JSON.stringify(error, null, 2));
+      alert('Koleksiyon oluşturulamadı.');
+      return;
+    }
+
+    setCollections((current) => [data, ...current]);
+    setNewCollectionName('');
+
+  } catch (err) {
+    console.log('Koleksiyon oluşturma hatası:', err);
   }
 };
 
@@ -263,6 +338,68 @@ const fetchFavoriteVenues = async (userId) => {
       ))}
     </ScrollView>
 
+  )}
+
+</View>
+
+
+
+{/* Koleksiyonlar */}
+<View style={styles.collectionsContainer}>
+
+  <Text style={styles.collectionsTitle}>
+    📁 Koleksiyonlarım
+  </Text>
+
+  <View style={styles.collectionInputRow}>
+    <TextInput
+      style={styles.collectionInput}
+      placeholder="Yeni koleksiyon adı..."
+      placeholderTextColor="#aaa"
+      value={newCollectionName}
+      onChangeText={setNewCollectionName}
+    />
+
+    <TouchableOpacity
+      style={styles.collectionAddButton}
+      onPress={handleCreateCollection}
+    >
+      <Text style={styles.collectionAddButtonText}>+</Text>
+    </TouchableOpacity>
+  </View>
+
+  {loadingCollections ? (
+    <ActivityIndicator
+      size="small"
+      color="#FF69B4"
+      style={{ marginTop: 10 }}
+    />
+  ) : collections.length === 0 ? (
+    <Text style={styles.emptyCollectionsText}>
+      Henüz koleksiyon oluşturmadın.
+    </Text>
+  ) : (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      style={{ marginTop: 12 }}
+    >
+      {collections.map((collection) => (
+        <TouchableOpacity
+          key={collection.id}
+          style={styles.collectionCard}
+        >
+          <Text style={styles.collectionIcon}>📁</Text>
+
+          <Text
+            style={styles.collectionName}
+            numberOfLines={1}
+          >
+            {collection.name}
+          </Text>
+        </TouchableOpacity>
+      ))}
+    </ScrollView>
   )}
 
 </View>
@@ -635,5 +772,78 @@ favoriteLocation: {
   fontSize: 11,
   color: '#DB7093',
   marginTop: 4,
+},
+
+collectionsContainer: {
+  backgroundColor: '#fff',
+  marginHorizontal: 15,
+  marginTop: 15,
+  borderRadius: 16,
+  padding: 15,
+},
+
+collectionsTitle: {
+  fontSize: 16,
+  fontWeight: 'bold',
+  color: '#DB7093',
+  marginBottom: 10,
+},
+
+collectionInputRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+},
+
+collectionInput: {
+  flex: 1,
+  height: 40,
+  backgroundColor: '#FFF0F5',
+  borderRadius: 10,
+  paddingHorizontal: 12,
+  color: '#333',
+  fontSize: 13,
+},
+
+collectionAddButton: {
+  width: 40,
+  height: 40,
+  borderRadius: 20,
+  backgroundColor: '#FF69B4',
+  justifyContent: 'center',
+  alignItems: 'center',
+  marginLeft: 8,
+},
+
+collectionAddButtonText: {
+  color: '#fff',
+  fontSize: 24,
+  fontWeight: 'bold',
+},
+
+emptyCollectionsText: {
+  color: '#aaa',
+  fontSize: 12,
+  marginTop: 10,
+},
+
+collectionCard: {
+  width: 120,
+  backgroundColor: '#FFF0F5',
+  borderRadius: 12,
+  padding: 12,
+  marginRight: 10,
+  borderWidth: 1,
+  borderColor: '#FFE4E1',
+},
+
+collectionIcon: {
+  fontSize: 22,
+  marginBottom: 6,
+},
+
+collectionName: {
+  color: '#DB7093',
+  fontSize: 13,
+  fontWeight: '600',
 },
 });

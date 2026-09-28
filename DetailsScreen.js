@@ -46,6 +46,12 @@ export default function DetailsScreen({ route, navigation }) {
 
   const [activeMainTab, setActiveMainTab] = useState('menu');
   const [activeMenuGroup, setActiveMenuGroup] = useState('yiyecek');
+  
+  // --- Koleksiyonlar ---
+  const [collections, setCollections] = useState([]);
+  const [newCollectionName, setNewCollectionName] = useState('');
+  const [loadingCollections, setLoadingCollections] = useState(false);
+
 
   // --- Canlı Durum ---
   const [liveCount, setLiveCount] = useState(0);
