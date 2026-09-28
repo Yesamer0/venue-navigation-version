@@ -39,6 +39,11 @@ export default function DetailsScreen({ route, navigation }) {
   const [currentUser, setCurrentUser] = useState(null);
   const [isOwner, setIsOwner] = useState(false);
 
+  // --- Favoriler ---
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [favoriteId, setFavoriteId] = useState(null);
+  const [loadingFavorite, setLoadingFavorite] = useState(false);
+
   const [activeMainTab, setActiveMainTab] = useState('menu');
   const [activeMenuGroup, setActiveMenuGroup] = useState('yiyecek');
 
@@ -122,11 +127,99 @@ export default function DetailsScreen({ route, navigation }) {
         .maybeSingle();
 
       setCurrentUser({ id: authUser.id, username: profile?.username || 'Gezgin' });
-      setIsOwner(item.owner_id === authUser.id);
-    } catch (err) {
-      console.log('Kullanıcı bilgisi alınamadı:', err);
+setIsOwner(item.owner_id === authUser.id);
+
+// Kullanıcının bu mekanı daha önce favorileyip favorilemediğini kontrol et
+await fetchFavoriteStatus(authUser.id);
+
+} catch (err) {
+  console.log('Kullanıcı bilgisi alınamadı:', err);
+}
+};
+
+const fetchFavoriteStatus = async (userId) => {
+  try {
+    const { data, error } = await supabase
+      .from('favorites')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('venue_id', item.id)
+      .maybeSingle();
+
+    if (error) {
+      console.log('Favori kontrol hatası:', error);
+      return;
     }
-  };
+
+    if (data) {
+      setIsFavorite(true);
+      setFavoriteId(data.id);
+    } else {
+      setIsFavorite(false);
+      setFavoriteId(null);
+    }
+  } catch (err) {
+    console.log('Favori kontrol hatası:', err);
+  }
+};
+
+const handleToggleFavorite = async () => {
+  if (!currentUser) {
+    alert('Favorilere eklemek için giriş yapmalısınız.');
+    return;
+  }
+
+  if (loadingFavorite) return;
+
+  setLoadingFavorite(true);
+
+  try {
+    if (isFavorite) {
+      // Zaten favorideyse favorilerden çıkar
+      const { error } = await supabase
+        .from('favorites')
+        .delete()
+        .eq('id', favoriteId);
+
+      if (error) {
+        console.log('Favori silme hatası:', error);
+        alert('Favoriden çıkarılırken bir hata oluştu.');
+        return;
+      }
+
+      setIsFavorite(false);
+      setFavoriteId(null);
+
+    } else {
+      // Favoride değilse favorilere ekle
+      const { data, error } = await supabase
+        .from('favorites')
+        .insert([
+          {
+            user_id: currentUser.id,
+            venue_id: item.id,
+          },
+        ])
+        .select('id')
+        .single();
+
+      if (error) {
+        console.log('Favori ekleme hatası:', error);
+        alert('Favorilere eklenirken bir hata oluştu.');
+        return;
+      }
+
+      setIsFavorite(true);
+      setFavoriteId(data.id);
+    }
+  } catch (err) {
+    console.log('Favori işlem hatası:', err);
+    alert('Bir bağlantı sorunu oluştu.');
+  } finally {
+    setLoadingFavorite(false);
+  }
+};
+
 
   const fetchLiveCount = async () => {
     setLoadingLiveCount(true);
@@ -553,19 +646,52 @@ export default function DetailsScreen({ route, navigation }) {
     <ScrollView style={{ height: SCREEN_HEIGHT, backgroundColor: '#fff' }} contentContainerStyle={{ paddingBottom: 40 }}>
       {/* ===== ÜST KISIM ===== */}
       <View>
-        <Image source={{ uri: item.image_url }} style={{ width: '100%', height: 180 }} />
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={{
-            position: 'absolute', top: 15, left: 15,
-            width: 38, height: 38, borderRadius: 19,
-            backgroundColor: 'rgba(0,0,0,0.45)',
-            justifyContent: 'center', alignItems: 'center',
-          }}
-        >
-          <Text style={{ color: '#fff', fontSize: 18, fontWeight: 'bold' }}>‹</Text>
-        </TouchableOpacity>
-      </View>
+  <Image source={{ uri: item.image_url }} style={{ width: '100%', height: 180 }} />
+
+  {/* Geri butonu */}
+  <TouchableOpacity
+    onPress={() => navigation.goBack()}
+    style={{
+      position: 'absolute', top: 15, left: 15,
+      width: 38, height: 38, borderRadius: 19,
+      backgroundColor: 'rgba(0,0,0,0.45)',
+      justifyContent: 'center', alignItems: 'center',
+    }}
+  >
+    <Text style={{ color: '#fff', fontSize: 18, fontWeight: 'bold' }}>‹</Text>
+  </TouchableOpacity>
+
+  {/* Favori butonu */}
+  <TouchableOpacity
+    onPress={handleToggleFavorite}
+    disabled={loadingFavorite}
+    style={{
+      position: 'absolute',
+      top: 15,
+      right: 15,
+      width: 38,
+      height: 38,
+      borderRadius: 19,
+      backgroundColor: 'rgba(0,0,0,0.45)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    }}
+  >
+    {loadingFavorite ? (
+      <ActivityIndicator color="#fff" size="small" />
+    ) : (
+      <Text
+        style={{
+          color: isFavorite ? '#FF69B4' : '#fff',
+          fontSize: 23,
+          fontWeight: 'bold',
+        }}
+      >
+        {isFavorite ? '♥' : '♡'}
+      </Text>
+    )}
+  </TouchableOpacity>
+</View>
 
       <View style={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 8 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
