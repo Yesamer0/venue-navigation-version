@@ -41,6 +41,9 @@ const [selectedCollection, setSelectedCollection] = useState(null);
 const [collectionVenues, setCollectionVenues] = useState([]);
 const [loadingCollectionVenues, setLoadingCollectionVenues] = useState(false);
 
+const [editingCollectionId, setEditingCollectionId] = useState(null);
+const [editingCollectionName, setEditingCollectionName] = useState('');
+
   const [posts, setPosts] = useState([
     { id: '1', text: 'Bugün harika bir kahve mekanı keşfettim! ☕✨', location: 'Kadıköy Kahvecisi', time: '2 saat önce', image: null },
     { id: '2', text: 'Venue uygulamasının arayüzü çok tatlı oldu, burası tam benlik.', location: '', time: 'Dün', image: null }
@@ -160,6 +163,118 @@ const fetchCollectionVenues = async (collection) => {
   }
 };
 
+const handleRemoveFromCollection = async (venueId) => {
+  if (!selectedCollection) {
+    return;
+  }
+
+  try {
+    const { error } = await supabase
+      .from('collection_venues')
+      .delete()
+      .eq('collection_id', selectedCollection.id)
+      .eq('venue_id', venueId);
+
+    if (error) {
+      console.log(
+        'Koleksiyondan çıkarma hatası:',
+        JSON.stringify(error, null, 2)
+      );
+      alert('Mekan koleksiyondan çıkarılamadı.');
+      return;
+    }
+
+    setCollectionVenues((currentVenues) =>
+      currentVenues.filter((venue) => venue.id !== venueId)
+    );
+
+    alert('Mekan koleksiyondan çıkarıldı.');
+
+  } catch (err) {
+    console.log('Koleksiyondan çıkarma hatası:', err);
+  }
+};
+
+const handleDeleteCollection = async (collectionId) => {
+  try {
+    const { error } = await supabase
+      .from('collections')
+      .delete()
+      .eq('id', collectionId);
+
+    if (error) {
+      console.log(
+        'Koleksiyon silme hatası:',
+        JSON.stringify(error, null, 2)
+      );
+      alert('Koleksiyon silinemedi.');
+      return;
+    }
+
+    setCollections((currentCollections) =>
+      currentCollections.filter(
+        (collection) => collection.id !== collectionId
+      )
+    );
+
+    if (selectedCollection?.id === collectionId) {
+      setSelectedCollection(null);
+      setCollectionVenues([]);
+    }
+
+    alert('Koleksiyon silindi.');
+
+  } catch (err) {
+    console.log('Koleksiyon silme hatası:', err);
+  }
+};
+
+const handleUpdateCollectionName = async (collectionId) => {
+  const name = editingCollectionName.trim();
+
+  if (!name) {
+    alert('Koleksiyon adı boş olamaz.');
+    return;
+  }
+
+  try {
+    const { error } = await supabase
+      .from('collections')
+      .update({ name: name })
+      .eq('id', collectionId);
+
+    if (error) {
+      console.log(
+        'Koleksiyon güncelleme hatası:',
+        JSON.stringify(error, null, 2)
+      );
+      alert('Koleksiyon adı güncellenemedi.');
+      return;
+    }
+
+    setCollections((currentCollections) =>
+      currentCollections.map((collection) =>
+        collection.id === collectionId
+          ? { ...collection, name: name }
+          : collection
+      )
+    );
+
+    if (selectedCollection?.id === collectionId) {
+      setSelectedCollection((currentCollection) => ({
+        ...currentCollection,
+        name: name,
+      }));
+    }
+
+    setEditingCollectionId(null);
+    setEditingCollectionName('');
+
+    alert('Koleksiyon adı güncellendi.');
+  } catch (err) {
+    console.log('Koleksiyon güncelleme hatası:', err);
+  }
+};
 
 const handleCreateCollection = async () => {
   const name = newCollectionName.trim();
@@ -427,109 +542,256 @@ const handleCreateCollection = async () => {
       style={{ marginTop: 12 }}
     >
       {collections.map((collection) => (
-        <TouchableOpacity
+        <View
           key={collection.id}
-          onPress={() => fetchCollectionVenues(collection)}
-          style={styles.collectionCard}
+          style={{
+            position: 'relative',
+            marginRight: 10,
+          }}
         >
-          <Text style={styles.collectionIcon}>📁</Text>
-
-          <Text
-            style={styles.collectionName}
-            numberOfLines={1}
+          {/* Koleksiyonu aç */}
+          <TouchableOpacity
+            onPress={() => fetchCollectionVenues(collection)}
+            style={styles.collectionCard}
           >
-            {collection.name}
-          </Text>
-        </TouchableOpacity>
+            <Text style={styles.collectionIcon}>📁</Text>
+
+            <Text
+              style={styles.collectionName}
+              numberOfLines={1}
+            >
+              {collection.name}
+            </Text>
+          </TouchableOpacity>
+           {/* Koleksiyon adını düzenle */}
+<TouchableOpacity
+  onPress={() => {
+    setEditingCollectionId(collection.id);
+    setEditingCollectionName(collection.name);
+  }}
+  style={{
+    position: 'absolute',
+    bottom: 4,
+    right: 4,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#DB7093',
+    justifyContent: 'center',
+    alignItems: 'center',
+  }}
+>
+  <Text
+    style={{
+      color: '#fff',
+      fontSize: 11,
+      fontWeight: 'bold',
+    }}
+  >
+    ✎
+  </Text>
+</TouchableOpacity>
+
+{editingCollectionId === collection.id && (
+  <View
+    style={{
+      marginTop: 8,
+      flexDirection: 'row',
+      alignItems: 'center',
+    }}
+  >
+    <TextInput
+      value={editingCollectionName}
+      onChangeText={setEditingCollectionName}
+      placeholder="Yeni isim"
+      style={{
+        width: 110,
+        backgroundColor: '#fff',
+        borderWidth: 1,
+        borderColor: '#DB7093',
+        borderRadius: 8,
+        paddingHorizontal: 8,
+        paddingVertical: 5,
+        fontSize: 12,
+      }}
+    />
+
+    <TouchableOpacity
+      onPress={() => handleUpdateCollectionName(collection.id)}
+      style={{
+        marginLeft: 5,
+        backgroundColor: '#DB7093',
+        borderRadius: 8,
+        paddingHorizontal: 8,
+        paddingVertical: 6,
+      }}
+    >
+      <Text
+        style={{
+          color: '#fff',
+          fontWeight: 'bold',
+          fontSize: 12,
+        }}
+      >
+        ✓
+      </Text>
+    </TouchableOpacity>
+  </View>
+)}
+
+          {/* Koleksiyonu sil */}
+          <TouchableOpacity
+            onPress={() => handleDeleteCollection(collection.id)}
+            style={{
+              position: 'absolute',
+              top: 4,
+              right: 4,
+              width: 22,
+              height: 22,
+              borderRadius: 11,
+              backgroundColor: 'rgba(0,0,0,0.65)',
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}
+          >
+            <Text
+              style={{
+                color: '#fff',
+                fontSize: 11,
+                fontWeight: 'bold',
+              }}
+            >
+              ✕
+            </Text>
+          </TouchableOpacity>
+        </View>
       ))}
     </ScrollView>
   )}
-{/* Seçilen Koleksiyonun İçindeki Mekanlar */}
-{selectedCollection && (
-  <View style={{ marginTop: 15 }}>
-    <Text
-      style={{
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#DB7093',
-        marginBottom: 10,
-      }}
-    >
-      📁 {selectedCollection.name}
-    </Text>
 
-    {loadingCollectionVenues ? (
-      <ActivityIndicator
-        size="small"
-        color="#FF69B4"
-      />
-    ) : collectionVenues.length === 0 ? (
+  {/* Seçilen Koleksiyonun İçindeki Mekanlar */}
+  {selectedCollection && (
+    <View style={{ marginTop: 15 }}>
+
       <Text
         style={{
-          color: '#999',
-          fontSize: 13,
+          fontSize: 16,
+          fontWeight: 'bold',
+          color: '#DB7093',
+          marginBottom: 10,
         }}
       >
-        Bu koleksiyonda henüz mekan yok.
+        📁 {selectedCollection.name}
       </Text>
-    ) : (
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-      >
-        {collectionVenues.map((venue) => (
-          <TouchableOpacity
-            key={venue.id}
-            onPress={() =>
-              navigation.navigate('Details', {
-                item: venue,
-              })
-            }
-            style={{
-              width: 130,
-              marginRight: 10,
-              backgroundColor: '#FFF0F5',
-              borderRadius: 12,
-              overflow: 'hidden',
-            }}
-          >
-            <Image
-              source={{ uri: venue.image_url }}
+
+      {loadingCollectionVenues ? (
+        <ActivityIndicator
+          size="small"
+          color="#FF69B4"
+        />
+      ) : collectionVenues.length === 0 ? (
+        <Text
+          style={{
+            color: '#999',
+            fontSize: 13,
+          }}
+        >
+          Bu koleksiyonda henüz mekan yok.
+        </Text>
+      ) : (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+        >
+          {collectionVenues.map((venue) => (
+            <View
+              key={venue.id}
               style={{
-                width: '100%',
-                height: 90,
+                width: 130,
+                marginRight: 10,
+                backgroundColor: '#FFF0F5',
+                borderRadius: 12,
+                overflow: 'hidden',
+                position: 'relative',
               }}
-            />
+            >
+              {/* Mekana git */}
+              <TouchableOpacity
+                onPress={() =>
+                  navigation.navigate('Details', {
+                    item: venue,
+                  })
+                }
+              >
+                <Image
+                  source={{ uri: venue.image_url }}
+                  style={{
+                    width: '100%',
+                    height: 90,
+                  }}
+                />
 
-            <View style={{ padding: 8 }}>
-              <Text
-                numberOfLines={1}
+                <View style={{ padding: 8 }}>
+                  <Text
+                    numberOfLines={1}
+                    style={{
+                      fontWeight: 'bold',
+                      color: '#DB7093',
+                      fontSize: 13,
+                    }}
+                  >
+                    {venue.name}
+                  </Text>
+
+                  <Text
+                    numberOfLines={1}
+                    style={{
+                      color: '#777',
+                      fontSize: 11,
+                      marginTop: 2,
+                    }}
+                  >
+                    {venue.location}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+
+              {/* Mekanı koleksiyondan çıkar */}
+              <TouchableOpacity
+                onPress={() =>
+                  handleRemoveFromCollection(venue.id)
+                }
                 style={{
-                  fontWeight: 'bold',
-                  color: '#DB7093',
-                  fontSize: 13,
+                  position: 'absolute',
+                  top: 5,
+                  right: 5,
+                  width: 24,
+                  height: 24,
+                  borderRadius: 12,
+                  backgroundColor: 'rgba(0,0,0,0.65)',
+                  justifyContent: 'center',
+                  alignItems: 'center',
                 }}
               >
-                {venue.name}
-              </Text>
+                <Text
+                  style={{
+                    color: '#fff',
+                    fontSize: 12,
+                    fontWeight: 'bold',
+                  }}
+                >
+                  ✕
+                </Text>
+              </TouchableOpacity>
 
-              <Text
-                numberOfLines={1}
-                style={{
-                  color: '#777',
-                  fontSize: 11,
-                  marginTop: 2,
-                }}
-              >
-                {venue.location}
-              </Text>
             </View>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-    )}
-  </View>
-)}
+          ))}
+        </ScrollView>
+      )}
+
+    </View>
+  )}
+
 </View>
 
       {/* Orta Kısım: Gelişmiş Paylaşım Kutusu */}
