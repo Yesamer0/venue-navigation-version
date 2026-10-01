@@ -1,10 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, FlatList, TouchableOpacity, Image, ActivityIndicator, SafeAreaView, TextInput } from 'react-native';
 import * as Location from 'expo-location';
+import MapView, { Marker } from 'react-native-maps';
 import { supabase } from './supabase'; 
 import { styles } from './styles';
 
 const PRICE_LEVELS = ['₺', '₺₺', '₺₺₺'];
+
+const calculateDistance = (lat1, lon1, lat2, lon2) => {
+  const R = 6371;
+
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return R * c;
+};
 
 export default function HomeScreen({ navigation }) {
   const [venues, setVenues] = useState([]);
@@ -24,6 +43,8 @@ export default function HomeScreen({ navigation }) {
   const [venueRatings, setVenueRatings] = useState({});
   const [userLocation, setUserLocation] = useState(null);
   const [loadingLocation, setLoadingLocation] = useState(false);
+  
+  
 
   useEffect(() => {
     fetchVenues();
@@ -128,18 +149,26 @@ export default function HomeScreen({ navigation }) {
       (a, b) => (venueRatings[b.id] || 0) - (venueRatings[a.id] || 0)
     );
   } else if (sortMode === 'distance' && userLocation) {
-    filteredVenues = [...filteredVenues]
-      .filter((v) => v.latitude != null && v.longitude != null)
-      .sort((a, b) => {
-        const distA = Math.sqrt(
-          Math.pow(a.latitude - userLocation.latitude, 2) + Math.pow(a.longitude - userLocation.longitude, 2)
-        );
-        const distB = Math.sqrt(
-          Math.pow(b.latitude - userLocation.latitude, 2) + Math.pow(b.longitude - userLocation.longitude, 2)
-        );
-        return distA - distB;
-      });
-  }
+  filteredVenues = [...filteredVenues]
+    .filter((v) => v.latitude != null && v.longitude != null)
+    .sort((a, b) => {
+      const distA = calculateDistance(
+        userLocation.latitude,
+        userLocation.longitude,
+        a.latitude,
+        a.longitude
+      );
+
+      const distB = calculateDistance(
+        userLocation.latitude,
+        userLocation.longitude,
+        b.latitude,
+        b.longitude
+      );
+
+      return distA - distB;
+    });
+}
 
   if (loading) {
     return (
@@ -299,6 +328,44 @@ export default function HomeScreen({ navigation }) {
         />
       </View>
 
+      <View
+  style={{
+    height: 250,
+    marginHorizontal: 15,
+    marginBottom: 15,
+    borderRadius: 20,
+    overflow: 'hidden',
+  }}
+>
+  <MapView
+    style={{ flex: 1 }}
+    initialRegion={{
+      latitude: 37.2153,
+      longitude: 28.3636,
+      latitudeDelta: 0.05,
+      longitudeDelta: 0.05,
+    }}
+  >
+    {filteredVenues
+      .filter(
+        (venue) =>
+          venue.latitude != null &&
+          venue.longitude != null
+      )
+      .map((venue) => (
+        <Marker
+          key={venue.id}
+          coordinate={{
+            latitude: Number(venue.latitude),
+            longitude: Number(venue.longitude),
+          }}
+          title={venue.name}
+          description={venue.location}
+        />
+      ))}
+  </MapView>
+</View>
+
       <FlatList
         data={filteredVenues}
         keyExtractor={(item) => item.id.toString()}
@@ -319,6 +386,24 @@ export default function HomeScreen({ navigation }) {
             <View style={styles.cardContent}>
               <Text style={styles.venueName}>{item.name}</Text>
               <Text style={styles.venueLocation}>{item.location}</Text>
+              {userLocation &&
+  item.latitude != null &&
+  item.longitude != null && (
+    <Text
+      style={{
+        color: '#B37690',
+        fontSize: 12,
+        marginTop: 3,
+      }}
+    >
+      📍 {calculateDistance(
+        userLocation.latitude,
+        userLocation.longitude,
+        item.latitude,
+        item.longitude
+      ).toFixed(1)} km uzakta
+    </Text>
+  )}
               {venueRatings[item.id] != null && (
                 <Text style={{ color: '#C2185B', fontSize: 13, fontWeight: '700', marginTop: 2 }}>
                   ⭐ {venueRatings[item.id].toFixed(1)}
