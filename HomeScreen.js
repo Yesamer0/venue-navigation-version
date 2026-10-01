@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, TouchableOpacity, Image, ActivityIndicator, SafeAreaView, TextInput } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';import { View, Text, FlatList, TouchableOpacity, Image, ActivityIndicator, SafeAreaView, TextInput } from 'react-native';
 import * as Location from 'expo-location';
 import MapView, { Marker } from 'react-native-maps';
 import { supabase } from './supabase'; 
@@ -43,7 +42,7 @@ export default function HomeScreen({ navigation }) {
   const [venueRatings, setVenueRatings] = useState({});
   const [userLocation, setUserLocation] = useState(null);
   const [loadingLocation, setLoadingLocation] = useState(false);
-  
+  const mapRef = useRef(null);
   
 
   useEffect(() => {
@@ -98,7 +97,41 @@ export default function HomeScreen({ navigation }) {
       prev.includes(level) ? prev.filter((l) => l !== level) : [...prev, level]
     );
   };
+  const goToMyLocation = async () => {
+  try {
+    let location = userLocation;
 
+    if (!location) {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+
+      if (status !== 'granted') {
+        alert('Konumunu gösterebilmek için konum izni vermelisin.');
+        return;
+      }
+
+      const currentLocation = await Location.getCurrentPositionAsync({});
+
+      location = {
+        latitude: currentLocation.coords.latitude,
+        longitude: currentLocation.coords.longitude,
+      };
+
+      setUserLocation(location);
+    }
+
+    mapRef.current?.animateToRegion(
+      {
+        latitude: location.latitude,
+        longitude: location.longitude,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+      },
+      1000
+    );
+  } catch (err) {
+    alert('Konum alınamadı: ' + err.message);
+  }
+};
   const handleSelectSort = async (mode) => {
     if (mode === 'distance') {
       try {
@@ -335,9 +368,11 @@ export default function HomeScreen({ navigation }) {
     marginBottom: 15,
     borderRadius: 20,
     overflow: 'hidden',
+    position: 'relative',
   }}
 >
   <MapView
+    ref={mapRef}
     style={{ flex: 1 }}
     initialRegion={{
       latitude: 37.2153,
@@ -361,9 +396,37 @@ export default function HomeScreen({ navigation }) {
           }}
           title={venue.name}
           description={venue.location}
+          onPress={() =>
+            navigation.navigate('Details', { item: venue })
+          }
         />
       ))}
   </MapView>
+
+  <TouchableOpacity
+    onPress={goToMyLocation}
+    style={{
+      position: 'absolute',
+      right: 12,
+      bottom: 12,
+      backgroundColor: '#fff',
+      paddingVertical: 9,
+      paddingHorizontal: 12,
+      borderRadius: 18,
+      elevation: 4,
+      zIndex: 10,
+    }}
+  >
+    <Text
+      style={{
+        color: '#9B1B4D',
+        fontWeight: '700',
+        fontSize: 12,
+      }}
+    >
+      📍 Konumuma Git
+    </Text>
+  </TouchableOpacity>
 </View>
 
       <FlatList
