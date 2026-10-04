@@ -351,8 +351,13 @@ export default function DetailsScreen({ route, navigation }) {
     setLoadingPhotos(false);
   };
 
-  const officialPhotos = venuePhotos.filter((p) => p.type === 'venue');
-  const taggedPhotos = venuePhotos.filter((p) => p.type !== 'venue');
+  const officialPhotos = venuePhotos.filter(
+  (p) => p.type === 'venue' || p.type === 'gallery'
+);
+
+const taggedPhotos = venuePhotos.filter(
+  (p) => p.type === 'tag'
+);
 
   const itemsInActiveGroup = menuItems.filter(
     (m) => getMenuGroup(m.category) === activeMenuGroup
@@ -611,21 +616,74 @@ export default function DetailsScreen({ route, navigation }) {
   };
 
   const handleDeletePhoto = async (photoId) => {
-    try {
-      const { error } = await supabase
-        .from('venue_photos')
-        .delete()
-        .eq('id', photoId);
-
-      if (error) {
-        alert('Silme Hatası: ' + error.message);
-      } else {
-        fetchVenuePhotos();
-      }
-    } catch (err) {
-      alert('Bir bağlantı sorunu oluştu.');
+  try {
+    if (!photoId) {
+      alert('Fotoğraf ID bulunamadı.');
+      return;
     }
-  };
+
+    console.log('Silinecek fotoğraf ID:', photoId);
+
+    // Önce fotoğrafın bilgilerini veritabanından al
+    const { data: photo, error: fetchError } = await supabase
+      .from('venue_photos')
+      .select('*')
+      .eq('id', photoId)
+      .single();
+
+    if (fetchError) {
+      console.log('Fotoğraf bilgisi alma hatası:', fetchError);
+      alert('Fotoğraf bilgisi alınamadı.');
+      return;
+    }
+
+    // Eğer Storage'a yüklediğimiz gallery fotoğrafıysa
+    // gerçek dosyayı da Storage'dan sil
+    if (photo.type === 'gallery' && photo.image_url) {
+      const marker = '/venue-images/';
+      const markerIndex = photo.image_url.indexOf(marker);
+
+      if (markerIndex !== -1) {
+        const filePath = decodeURIComponent(
+          photo.image_url.substring(markerIndex + marker.length)
+        );
+
+        console.log('Storage dosya yolu:', filePath);
+
+        const { error: storageError } = await supabase.storage
+          .from('venue-images')
+          .remove([filePath]);
+
+        if (storageError) {
+          console.log('Storage silme hatası:', storageError);
+          alert('Fotoğraf Storage alanından silinemedi.');
+          return;
+        }
+      }
+    }
+
+    // venue_photos tablosundaki kaydı sil
+    const { error: deleteError } = await supabase
+      .from('venue_photos')
+      .delete()
+      .eq('id', photoId);
+
+    if (deleteError) {
+      console.log('Fotoğraf silme hatası:', deleteError);
+      alert('Silme Hatası: ' + deleteError.message);
+      return;
+    }
+
+    // Ekranı yenile
+    await fetchVenuePhotos();
+
+    alert('Fotoğraf başarıyla silindi.');
+
+  } catch (err) {
+    console.log('Fotoğraf silme hatası:', err);
+    alert('Bir bağlantı sorunu oluştu.');
+  }
+};
 
   const renderMenuItemRow = (menuItem) => {
     const isEditingThis = editingMenuId === menuItem.id;
@@ -1051,12 +1109,51 @@ export default function DetailsScreen({ route, navigation }) {
           ) : (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 20 }}>
               {officialPhotos.map((photo) => (
-                <Image
-                  key={photo.id}
-                  source={{ uri: photo.image_url }}
-                  style={{ width: 140, height: 140, borderRadius: 14, marginRight: 12 }}
-                />
-              ))}
+  <View
+    key={photo.id}
+    style={{
+      width: 140,
+      height: 140,
+      marginRight: 12,
+    }}
+  >
+    <Image
+      source={{ uri: photo.image_url }}
+      style={{
+        width: '100%',
+        height: '100%',
+        borderRadius: 14,
+      }}
+    />
+
+    {isOwner && (
+      <TouchableOpacity
+        onPress={() => handleDeletePhoto(photo.id)}
+        style={{
+          position: 'absolute',
+          top: 6,
+          right: 6,
+          width: 26,
+          height: 26,
+          borderRadius: 13,
+          backgroundColor: 'rgba(0,0,0,0.65)',
+          justifyContent: 'center',
+          alignItems: 'center',
+        }}
+      >
+        <Text
+          style={{
+            color: '#fff',
+            fontSize: 13,
+            fontWeight: 'bold',
+          }}
+        >
+          ✕
+        </Text>
+      </TouchableOpacity>
+    )}
+  </View>
+))}
             </ScrollView>
           )}
         </View>
