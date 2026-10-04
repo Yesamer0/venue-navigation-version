@@ -12,6 +12,7 @@ import {
   Platform
 } from 'react-native';
 import { supabase } from './supabase';
+import * as ImagePicker from 'expo-image-picker';
 
 export default function VenueOwnerScreen({ navigation }) {
   const [username, setUsername] = useState('Mekan Sahibi');
@@ -52,6 +53,191 @@ export default function VenueOwnerScreen({ navigation }) {
     }
     setLoadingVenues(false);
   };
+
+
+  const pickVenueImage = async (venue) => {
+  try {
+    // 1. Galeri izni
+    const permissionResult =
+      await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (!permissionResult.granted) {
+      alert('Fotoğraf seçebilmek için galeri izni vermelisin.');
+      return;
+    }
+
+    // 2. Galeriden fotoğraf seç
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.8,
+    });
+
+    if (result.canceled) {
+      return;
+    }
+
+    const imageUri = result.assets[0].uri;
+
+    // 3. Telefonda bulunan fotoğrafı dosya verisine çevir
+    const response = await fetch(imageUri);
+    const arrayBuffer = await response.arrayBuffer();
+
+    // 4. Dosya adı oluştur
+    const fileExtension =
+      result.assets[0].fileName?.split('.').pop() || 'jpg';
+
+    const filePath =
+      `${venue.id}/${Date.now()}.${fileExtension}`;
+
+    // 5. Supabase Storage'a yükle
+    const { error: uploadError } = await supabase.storage
+      .from('venue-images')
+      .upload(filePath, arrayBuffer, {
+        contentType:
+          result.assets[0].mimeType || 'image/jpeg',
+        upsert: false,
+      });
+
+    if (uploadError) {
+      console.log('Fotoğraf yükleme hatası:', uploadError);
+      alert('Fotoğraf Storage alanına yüklenemedi.');
+      return;
+    }
+
+    // 6. Public URL al
+    const { data: publicUrlData } = supabase.storage
+      .from('venue-images')
+      .getPublicUrl(filePath);
+
+    const publicUrl = publicUrlData.publicUrl;
+
+    // 7. venues tablosundaki image_url alanını güncelle
+    const { error: updateError } = await supabase
+      .from('venues')
+      .update({
+        image_url: publicUrl,
+      })
+      .eq('id', venue.id);
+
+    if (updateError) {
+      console.log('Venue fotoğraf güncelleme hatası:', updateError);
+      alert('Fotoğraf yüklendi fakat mekana kaydedilemedi.');
+      return;
+    }
+
+    // 8. Ekrandaki mekan listesini de güncelle
+    setMyVenues((currentVenues) =>
+      currentVenues.map((currentVenue) =>
+        currentVenue.id === venue.id
+          ? { ...currentVenue, image_url: publicUrl }
+          : currentVenue
+      )
+    );
+
+    alert('Kapak fotoğrafı başarıyla eklendi.');
+
+  } catch (err) {
+    console.log('Fotoğraf işlemi hatası:', err);
+    alert('Fotoğraf yüklenirken bir hata oluştu.');
+  }
+};
+
+const addGalleryPhoto = async (venue) => {
+  try {
+    // 1. Galeri izni
+    const permissionResult =
+      await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (!permissionResult.granted) {
+      alert('Fotoğraf seçebilmek için galeri izni vermelisin.');
+      return;
+    }
+
+    // 2. Fotoğraf seç
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      quality: 0.8,
+    });
+
+    if (result.canceled) {
+      return;
+    }
+
+    // 3. Giriş yapan kullanıcıyı al
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      alert('Fotoğraf eklemek için giriş yapmalısın.');
+      return;
+    }
+
+    // 4. Fotoğrafı dosya verisine çevir
+    const imageUri = result.assets[0].uri;
+
+    const response = await fetch(imageUri);
+    const arrayBuffer = await response.arrayBuffer();
+
+    // 5. Dosya yolunu oluştur
+    const fileExtension =
+      result.assets[0].fileName?.split('.').pop() || 'jpg';
+
+    const filePath =
+      `${venue.id}/gallery/${Date.now()}.${fileExtension}`;
+
+    // 6. Storage'a yükle
+    const { error: uploadError } = await supabase.storage
+      .from('venue-images')
+      .upload(filePath, arrayBuffer, {
+        contentType:
+          result.assets[0].mimeType || 'image/jpeg',
+        upsert: false,
+      });
+
+    if (uploadError) {
+      console.log('Galeri upload hatası:', uploadError);
+      alert('Fotoğraf yüklenemedi.');
+      return;
+    }
+
+    // 7. Public URL al
+    const { data: publicUrlData } = supabase.storage
+      .from('venue-images')
+      .getPublicUrl(filePath);
+
+    const publicUrl = publicUrlData.publicUrl;
+
+    // 8. venue_photos tablosuna kaydet
+    const { error: insertError } = await supabase
+      .from('venue_photos')
+      .insert([
+        {
+          venue_id: venue.id,
+          user_id: user.id,
+          image_url: publicUrl,
+          type: 'gallery',
+        },
+      ]);
+
+    if (insertError) {
+      console.log('Galeri kayıt hatası:', insertError);
+      alert('Fotoğraf yüklendi fakat galeriye kaydedilemedi.');
+      return;
+    }
+
+    alert('Galeri fotoğrafı eklendi.');
+
+  } catch (err) {
+    console.log('Galeri fotoğraf hatası:', err);
+    alert('Galeri fotoğrafı eklenirken hata oluştu.');
+  }
+};
+
+
 
   const handlePublishAnnouncement = () => {
     if (!announcementText.trim()) {
@@ -120,12 +306,42 @@ export default function VenueOwnerScreen({ navigation }) {
             <View key={venue.id} style={styles.venueCard}>
               <Text style={styles.venueCardName} numberOfLines={1}>{venue.name}</Text>
               <Text style={styles.venueCardCategory}>{venue.category || 'Kategori yok'}</Text>
-              <TouchableOpacity
-                style={styles.manageButton}
-                onPress={() => navigation.navigate('Details', { item: venue })}
-              >
-                <Text style={styles.manageButtonText}>Menü / Fotoğraf Ekle</Text>
-              </TouchableOpacity>
+              <View
+  style={{
+    flexDirection: 'row',
+    gap: 6,
+    marginTop: 2,
+  }}
+>
+  <TouchableOpacity
+    style={[styles.manageButton, { flex: 1 }]}
+    onPress={() => pickVenueImage(venue)}
+  >
+    <Text style={styles.manageButtonText}>
+      📷 Kapak
+    </Text>
+  </TouchableOpacity>
+
+  <TouchableOpacity
+    style={[styles.manageButton, { flex: 1 }]}
+    onPress={() => addGalleryPhoto(venue)}
+  >
+    <Text style={styles.manageButtonText}>
+      🖼️ Galeri
+    </Text>
+  </TouchableOpacity>
+</View>
+
+<TouchableOpacity
+  style={[styles.manageButton, { marginTop: 7 }]}
+  onPress={() =>
+    navigation.navigate('Details', { item: venue })
+  }
+>
+  <Text style={styles.manageButtonText}>
+    ⚙️ Mekanı Yönet
+  </Text>
+</TouchableOpacity>
             </View>
           ))}
         </ScrollView>
@@ -371,6 +587,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 14,
     padding: 14,
+    paddingBottom: 25,
     marginRight: 12,
     width: 180,
     borderWidth: 1,
@@ -385,7 +602,7 @@ const styles = StyleSheet.create({
   venueCardCategory: {
     fontSize: 12,
     color: '#4A90E2',
-    marginBottom: 10,
+    marginBottom: 2,
   },
   manageButton: {
     backgroundColor: '#F0F7FF',
