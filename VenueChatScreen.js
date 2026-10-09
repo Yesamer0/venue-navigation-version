@@ -333,34 +333,81 @@ const removePresence = async (userId) => {
   channelRef.current = channel;
 };
 
-  const handleSend = async () => {
-    if (!messageText.trim()) return;
-    if (!currentUser) {
-      alert('Mesaj gönderebilmek için giriş yapmalısın.');
+  
+const handleSend = async () => {
+  const text = messageText.trim();
+
+  if (!text || isSending) return;
+
+  if (!currentUser) {
+    alert('Mesaj gönderebilmek için giriş yapmalısın.');
+    return;
+  }
+
+  if (!isNearVenue) {
+    alert('Mesaj göndermek için mekanda bulunmalısın.');
+    return;
+  }
+
+  setIsSending(true);
+
+  try {
+    // Save the message and get its ID
+    const { data: savedMessage, error } = await supabase
+      .from('messages')
+      .insert([
+        {
+          venue_id: item.id,
+          user_id: currentUser.id,
+          display_name: sendAnonymous
+            ? anonName
+            : currentUser.username,
+          is_anonymous: sendAnonymous,
+          message: text,
+        },
+      ])
+      .select('id')
+      .single();
+
+    if (error) {
+      alert('Mesaj Hatası: ' + error.message);
       return;
     }
 
-    setIsSending(true);
-    try {
-      const { error } = await supabase.from('messages').insert([{
-        venue_id: item.id,
-        user_id: currentUser.id,
-        display_name: sendAnonymous ? anonName : currentUser.username,
-        is_anonymous: sendAnonymous,
-        message: messageText.trim(),
-      }]);
+    setMessageText('');
 
-      if (error) {
-        alert('Mesaj Hatası: ' + error.message);
-      } else {
-        setMessageText('');
+    // Request a push notification
+    try {
+      const { error: notificationError } =
+        await supabase.functions.invoke(
+          'notify-venue-message',
+          {
+            body: {
+              message_id: savedMessage.id,
+            },
+          }
+        );
+
+      if (notificationError) {
+        console.log(
+          'Notification error:',
+          notificationError.message
+        );
       }
-    } catch (err) {
-      alert('Bir bağlantı sorunu oluştu.');
-    } finally {
-      setIsSending(false);
+    } catch (notificationError) {
+      console.log(
+        'Notification request failed:',
+        notificationError
+      );
     }
-  };
+  } catch (err) {
+    console.log('Message send error:', err);
+    alert('Bir bağlantı sorunu oluştu.');
+  } finally {
+    setIsSending(false);
+  }
+};
+
 
   // --- Konum kontrol ekranı ---
   if (checkingLocation) {
