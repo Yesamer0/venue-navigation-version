@@ -8,7 +8,8 @@ import {
   ActivityIndicator,
   Platform 
 } from 'react-native';
-import { supabase } from './supabase'; 
+import { supabase } from './supabase';
+import { registerForPushNotificationsAsync } from './pushNotifications';
 
 export default function AuthScreen({ navigation }) {
   const [username, setUsername] = useState('');
@@ -19,146 +20,163 @@ export default function AuthScreen({ navigation }) {
   const [isVenueOwner, setIsVenueOwner] = useState(false);
 
   const handleAuth = async () => {
-    if (isRegisterMode && (!username || !email || !password)) {
-      alert("Lütfen tüm alanları doldurun.");
-      return;
-    }
-    if (!isRegisterMode && (!email || !password)) {
-      alert("Lütfen e-posta ve şifre alanlarını doldurun.");
+  if (isRegisterMode && (!username || !email || !password)) {
+    alert("Lütfen tüm alanları doldurun.");
+    return;
+  }
+
+  if (!isRegisterMode && (!email || !password)) {
+    alert("Lütfen e-posta ve şifre alanlarını doldurun.");
+    return;
+  }
+
+  setLoading(true);
+
+  if (isRegisterMode) {
+    if (password.length < 7 || password.length > 20) {
+      alert("Şifre en az 7, en fazla 20 karakter uzunluğunda olmalıdır.");
+      setLoading(false);
       return;
     }
 
-    setLoading(true);
+    try {
+      // Check whether the username already exists
+      const { data: existingUser, error: checkError } = await supabase
+        .from('users')
+        .select('username')
+        .eq('username', username)
+        .maybeSingle();
 
-    if (isRegisterMode) {
-      if (password.length < 7 || password.length > 20) {
-        alert("Şifre en az 7, en fazla 20 karakter uzunluğunda olmalıdır.");
-        setLoading(false);
+      if (checkError) {
+        console.log('USERNAME CHECK ERROR:', checkError);
+        alert(
+          "Kullanıcı adı kontrol edilirken bir hata oluştu: " +
+          checkError.message
+        );
         return;
       }
 
-      try {
-        // 1. Kullanıcı adı kontrolünü yeni açtığımız 'username' kolonundan yapıyoruz
-        const { data: existingUser, error: checkError } = await supabase
-          .from('users')
-          .select('username')
-          .eq('username', username)
-          .maybeSingle();
-
-        if (checkError) {
-          console.log('KULLANICI ADI KONTROL HATASI:', checkError);
-          alert("Kullanıcı adı kontrol edilirken bir hata oluştu: " + checkError.message);
-          setLoading(false);
-          return;
-        }
-
-        if (existingUser) {
-          alert("Bu kullanıcı adı başkası tarafından alınmış. Lütfen farklı bir isim seçin.");
-          setLoading(false);
-          return;
-        }
-
-        // 2. Supabase Auth Kaydı
-        const { data: signUpData, error } = await supabase.auth.signUp({
-          email: email,
-          password: password,
-          options: {
-            data: { 
-              username: username,
-              is_venue: isVenueOwner 
-            }
-          }
-        });
-
-        if (error) throw error;
-
-        const userId = signUpData?.user?.id || signUpData?.data?.user?.id;
-
-        if (!userId) {
-          alert("Kayıt Hatası: Kullanıcı kimliği alınamadı. Lütfen tekrar deneyin.");
-          setLoading(false);
-          return;
-        }
-
-        // 3. Mevcut yapıyı bozmamak için hem 'name' hem 'username' alanlarını beraber besliyoruz!
-        // ÖNEMLİ: Bu insert'in hatasını mutlaka kontrol ediyoruz.
-        // Eğer bu satır sessizce başarısız olursa (örn. RLS/email confirmation
-        // yüzünden), is_venue hiç kaydedilmez ve giriş yapınca kullanıcı
-        // yanlışlıkla Profile sayfasına yönlendirilir.
-        const { error: insertError } = await supabase
-          .from('users')
-          .insert([{ 
-            id: userId, 
-            username: username, // Yeni eklediğin sütun
-            name: username,     // Projenin orijinal name sütunu
-            email: email,       // Tablondaki email sütunu
-            is_venue: isVenueOwner 
-          }]);
-
-        if (insertError) {
-          console.log('KULLANICI TABLOSUNA EKLEME HATASI:', insertError);
-          alert(
-            "Kayıt Hatası: Hesabınız oluşturuldu fakat profil bilgileriniz kaydedilemedi.\n\n" +
-            "Detay: " + insertError.message + "\n\n" +
-            "Bu genelde Supabase'de 'Confirm email' ayarı açıkken veya 'users' " +
-            "tablosunda uygun bir RLS INSERT politikası yokken oluşur."
-          );
-          setLoading(false);
-          return;
-        }
-
-        alert("Kayıt başarılı! Şimdi giriş yapabilirsiniz.");
-        setIsRegisterMode(false); 
-
-      } catch (error) {
-        alert("Kayıt Hatası: " + error.message);
-      } finally {
-        setLoading(false);
+      if (existingUser) {
+        alert(
+          "Bu kullanıcı adı başkası tarafından alınmış. Lütfen farklı bir isim seçin."
+        );
+        return;
       }
 
-    } else {
-      try {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email: email,
-          password: password,
-        });
+      // Create Supabase Auth account
+      const { data: signUpData, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            username,
+            is_venue: isVenueOwner,
+          },
+        },
+      });
 
-        if (error) throw error;
+      if (error) throw error;
 
-        const loginUserId = data?.user?.id;
-        
-        // Giriş yaparken rol kontrolünü çekiyoruz
-        const { data: userData, error: fetchError } = await supabase
-          .from('users')
-          .select('is_venue')
-          .eq('id', loginUserId)
-          .single();
+      const userId = signUpData?.user?.id;
 
-        if (fetchError) {
-          console.log('ROL BİLGİSİ ÇEKME HATASI:', fetchError);
-          alert(
-            "Giriş yapıldı fakat profil bilgileriniz bulunamadı.\n\n" +
-            "Detay: " + fetchError.message
-          );
-          setLoading(false);
-          return;
-        }
-
-        alert("Başarıyla giriş yapıldı!");
-
-        // Artık Profile/VenueOwner ayrı Stack ekranı değil, MainTabs
-        // içindeki tek bir "Profil" sekmesi (ProfileOrVenueScreen) rolüne
-        // göre otomatik doğru ekranı gösteriyor. O yüzden ikisinde de
-        // sadece 'Main'e yönlendiriyoruz.
-        navigation.replace('Main');
-        
-      } catch (error) {
-        alert("Giriş Hatası: " + error.message);
-      } finally {
-        setLoading(false);
+      if (!userId) {
+        alert(
+          "Kayıt Hatası: Kullanıcı kimliği alınamadı. Lütfen tekrar deneyin."
+        );
+        return;
       }
+
+      // Save user profile
+      const { error: insertError } = await supabase
+        .from('users')
+        .insert([
+          {
+            id: userId,
+            username,
+            name: username,
+            email,
+            is_venue: isVenueOwner,
+          },
+        ]);
+
+      if (insertError) {
+        console.log('USER PROFILE INSERT ERROR:', insertError);
+
+        alert(
+          "Kayıt Hatası: Hesabınız oluşturuldu fakat profil bilgileriniz kaydedilemedi.\n\n" +
+          "Detay: " + insertError.message + "\n\n" +
+          "Bu genelde Supabase'de 'Confirm email' ayarı açıkken veya 'users' " +
+          "tablosunda uygun bir RLS INSERT politikası yokken oluşur."
+        );
+
+        return;
+      }
+
+      alert("Kayıt başarılı! Şimdi giriş yapabilirsiniz.");
+      setIsRegisterMode(false);
+
+    } catch (error) {
+      alert("Kayıt Hatası: " + error.message);
+    } finally {
+      setLoading(false);
     }
-  };
+
+  } else {
+    try {
+      // Sign in
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) throw error;
+
+      const loginUserId = data?.user?.id;
+
+      if (!loginUserId) {
+        throw new Error('User ID is missing after login.');
+      }
+
+      // Fetch user role
+      const { data: userData, error: fetchError } = await supabase
+        .from('users')
+        .select('is_venue')
+        .eq('id', loginUserId)
+        .single();
+
+      if (fetchError) {
+        console.log('USER ROLE FETCH ERROR:', fetchError);
+
+        alert(
+          "Giriş yapıldı fakat profil bilgileriniz bulunamadı.\n\n" +
+          "Detay: " + fetchError.message
+        );
+
+        return;
+      }
+
+      // Register push token without blocking login
+      try {
+        await registerForPushNotificationsAsync(loginUserId);
+      } catch (notificationError) {
+        console.log(
+          'PUSH NOTIFICATION REGISTRATION ERROR:',
+          notificationError
+        );
+      }
+
+      alert("Başarıyla giriş yapıldı!");
+
+      // Navigate to the main application
+      navigation.replace('Main');
+
+    } catch (error) {
+      alert("Giriş Hatası: " + error.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+};
 
   return (
     <View style={styles.container}>

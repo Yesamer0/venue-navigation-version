@@ -5,25 +5,73 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { useFonts, Chewy_400Regular } from '@expo-google-fonts/chewy';
 
-// Ekranları içeri aktar
+import * as Notifications from 'expo-notifications';
+
+// Screens
 import AuthScreen from './AuthScreen';
-import MainTabs from './MainTabs'; // Home + Profil sekmelerini içeren alt menü (artık her sekmenin kendi iç stack'i var)
+import MainTabs from './MainTabs';
 
 const Stack = createStackNavigator();
+
+// Configure notification behavior
+if (Platform.OS !== 'web') {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowBanner: true,
+      shouldShowList: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+    }),
+  });
+}
+
+// Request notification permission
+const requestNotificationPermission = async () => {
+  if (Platform.OS === 'web') {
+    return false;
+  }
+
+  try {
+    const { status: existingStatus } =
+      await Notifications.getPermissionsAsync();
+
+    let finalStatus = existingStatus;
+
+    if (existingStatus !== 'granted') {
+      const { status } =
+        await Notifications.requestPermissionsAsync();
+
+      finalStatus = status;
+    }
+
+    if (finalStatus !== 'granted') {
+      console.log('Notification permission denied');
+      return false;
+    }
+
+    console.log('Notification permission granted');
+    return true;
+  } catch (error) {
+    console.log('Notification permission error:', error);
+    return false;
+  }
+};
 
 export default function App() {
   const [fontsLoaded] = useFonts({
     Chewy_400Regular,
   });
 
-  // WEB İÇİN KRİTİK DÜZELTME: React Native'in flex:1 / ScrollView mantığının
-  // web'de doğru çalışabilmesi için html, body ve #root elemanlarının da
-  // yüksekliğinin %100 olması gerekiyor. Expo bunu otomatik ayarlamıyor,
-  // bu yüzden hiçbir ekranda (Details, Chat, hiçbiri) iç ScrollView'ler
-  // düzgün kaymıyordu. Bu efekt sadece web'de çalışır, native'de (telefon) etkisizdir.
+  // Request permission when the app starts
+  useEffect(() => {
+    requestNotificationPermission();
+  }, []);
+
+  // Keep web layout working correctly
   useEffect(() => {
     if (Platform.OS === 'web') {
       const style = document.createElement('style');
+
       style.innerHTML = `
         html, body, #root {
           height: 100%;
@@ -31,13 +79,25 @@ export default function App() {
           padding: 0;
         }
       `;
+
       document.head.appendChild(style);
+
+      return () => {
+        document.head.removeChild(style);
+      };
     }
   }, []);
 
   if (!fontsLoaded) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FFF0F5' }}>
+      <View
+        style={{
+          flex: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+          backgroundColor: '#FFF0F5',
+        }}
+      >
         <ActivityIndicator size="large" color="#C2185B" />
       </View>
     );
@@ -45,7 +105,7 @@ export default function App() {
 
   return (
     <NavigationContainer>
-      <Stack.Navigator 
+      <Stack.Navigator
         initialRouteName="Auth"
         screenOptions={{
           headerStyle: { backgroundColor: '#fff' },
@@ -53,19 +113,16 @@ export default function App() {
           headerTitleStyle: { fontWeight: 'bold' },
         }}
       >
-        <Stack.Screen 
-          name="Auth" 
-          component={AuthScreen} 
-          options={{ headerShown: false }} 
+        <Stack.Screen
+          name="Auth"
+          component={AuthScreen}
+          options={{ headerShown: false }}
         />
 
-        {/* Home ve Profil artık ayrı Stack ekranları değil,
-            MainTabs içindeki alt sekmeler. Giriş yapınca
-            navigation.replace('Main') ile buraya geliniyor. */}
-        <Stack.Screen 
-          name="Main" 
-          component={MainTabs} 
-          options={{ headerShown: false }} 
+        <Stack.Screen
+          name="Main"
+          component={MainTabs}
+          options={{ headerShown: false }}
         />
       </Stack.Navigator>
     </NavigationContainer>
