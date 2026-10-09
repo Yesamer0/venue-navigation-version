@@ -20,7 +20,7 @@ const HEARTBEAT_MS = 5 * 60 * 1000; // 5 dakikada bir "hâlâ buradayım" tazele
 // true iken konum kontrolü tamamen atlanır, herkes sohbete girebilir.
 // Gerçek konumdan uzakken test edebilmen için var. Yayına almadan
 // önce (veya gerçek konum testine geçince) MUTLAKA false yap!
-const DEV_SKIP_LOCATION_CHECK = true;
+const DEV_SKIP_LOCATION_CHECK = false;
 
 const ANON_ADJECTIVES = ['Gizemli', 'Sessiz', 'Meraklı', 'Neşeli', 'Uykulu', 'Hızlı', 'Tembel', 'Cesur'];
 const ANON_NOUNS = ['Kedi', 'Baykuş', 'Tilki', 'Panda', 'Yunus', 'Kaplan', 'Tavşan', 'Kartal'];
@@ -65,17 +65,30 @@ export default function VenueChatScreen({ route, navigation }) {
   const flatListRef = useRef(null);
   const channelRef = useRef(null);
   const heartbeatRef = useRef(null);
+  const locationWatcherRef = useRef(null);
+  const isCheckingOutRef = useRef(false);
 
   useEffect(() => {
     init();
     return () => {
-      if (channelRef.current) {
-        supabase.removeChannel(channelRef.current);
-      }
-      if (heartbeatRef.current) {
-        clearInterval(heartbeatRef.current);
-      }
-    };
+  // Stop Supabase Realtime subscription
+  if (channelRef.current) {
+    supabase.removeChannel(channelRef.current);
+    channelRef.current = null;
+  }
+
+  // Stop heartbeat timer
+  if (heartbeatRef.current) {
+    clearInterval(heartbeatRef.current);
+    heartbeatRef.current = null;
+  }
+
+  // Stop GPS tracking
+  if (locationWatcherRef.current) {
+    locationWatcherRef.current.remove();
+    locationWatcherRef.current = null;
+  }
+};
   }, []);
 
   const init = async () => {
@@ -114,6 +127,94 @@ export default function VenueChatScreen({ route, navigation }) {
       console.log('Presence güncellenemedi:', err);
     }
   };
+
+const removePresence = async (userId) => {
+  if (!userId) return false;
+
+  const { error } = await supabase
+    .from('venue_presence')
+    .delete()
+    .eq('venue_id', item.id)
+    .eq('user_id', userId);
+
+  if (error) {
+    console.log('Presence removal error:', error.message);
+    return false;
+  }
+
+  return true;
+};
+
+
+  const startLocationTracking = async (userId) => {
+  if (locationWatcherRef.current) return;
+
+  locationWatcherRef.current = await Location.watchPositionAsync(
+    {
+      accuracy: Location.Accuracy.High,
+      distanceInterval: 20,
+    },
+    async (location) => {
+      const newDistance = distanceInMeters(
+        location.coords.latitude,
+        location.coords.longitude,
+        Number(item.latitude),
+        Number(item.longitude)
+      );
+
+      setDistance(Math.round(newDistance));
+
+      // Check if the user has left the venue
+      if (newDistance > 150 && !isCheckingOutRef.current) {
+        if (!userId) {
+          console.log('Cannot check out: user ID is missing');
+          return;
+        }
+
+        isCheckingOutRef.current = true;
+
+        try {
+          const removed = await removePresence(userId);
+
+          if (!removed) {
+            console.log('Check-out failed. Waiting for next GPS update.');
+            return;
+          }
+
+          // Close chat access
+          setIsNearVenue(false);
+
+          // Stop Realtime subscription
+          if (channelRef.current) {
+            supabase.removeChannel(channelRef.current);
+            channelRef.current = null;
+          }
+
+          // Stop presence heartbeat
+          if (heartbeatRef.current) {
+            clearInterval(heartbeatRef.current);
+            heartbeatRef.current = null;
+          }
+
+          // Stop GPS tracking
+          locationWatcherRef.current?.remove();
+          locationWatcherRef.current = null;
+        } catch (error) {
+          console.log('Check-out error:', error);
+        } finally {
+          isCheckingOutRef.current = false;
+        }
+
+        return;
+      }
+
+      // Keep chat access while the user is near the venue
+      if (newDistance <= 150) {
+        setIsNearVenue(true);
+      }
+    }
+  );
+};
 
   const checkLocation = async (user) => {
     setCheckingLocation(true);
@@ -160,6 +261,7 @@ export default function VenueChatScreen({ route, navigation }) {
         setIsNearVenue(true);
         fetchMessages();
         subscribeToMessages();
+        await startLocationTracking(user?.id);
 
         // Konum doğrulandı: "buradayım" kaydını oluştur ve
         // sohbet açık kaldığı sürece her 5 dakikada bir tazele.
@@ -197,19 +299,39 @@ export default function VenueChatScreen({ route, navigation }) {
   };
 
   const subscribeToMessages = () => {
-    const channel = supabase
-      .channel(`venue-chat-${item.id}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'messages', filter: `venue_id=eq.${item.id}` },
-        (payload) => {
-          setMessages((prev) => [...prev, payload.new]);
-        }
-      )
-      .subscribe();
+  // Prevent multiple Realtime subscriptions
+  if (channelRef.current) return;
 
-    channelRef.current = channel;
-  };
+  const channel = supabase
+    .channel(`venue-chat-${item.id}`)
+    .on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'messages',
+        filter: `venue_id=eq.${item.id}`,
+      },
+      (payload) => {
+        setMessages((prev) => {
+          // Check whether the message already exists
+          const alreadyExists = prev.some(
+            (msg) => msg.id === payload.new.id
+          );
+
+          if (alreadyExists) {
+            return prev;
+          }
+
+          // Add the new message
+          return [...prev, payload.new];
+        });
+      }
+    )
+    .subscribe();
+
+  channelRef.current = channel;
+};
 
   const handleSend = async () => {
     if (!messageText.trim()) return;
@@ -318,28 +440,62 @@ export default function VenueChatScreen({ route, navigation }) {
             </Text>
           }
           renderItem={({ item: msg }) => {
-            const isMine = currentUser && msg.user_id === currentUser.id;
-            return (
-              <View
-                style={{
-                  alignSelf: isMine ? 'flex-end' : 'flex-start',
-                  backgroundColor: isMine ? '#FF69B4' : '#F3F3F3',
-                  borderRadius: 14,
-                  paddingVertical: 8,
-                  paddingHorizontal: 12,
-                  marginBottom: 8,
-                  maxWidth: '78%',
-                }}
-              >
-                {!isMine && (
-                  <Text style={{ fontSize: 11, fontWeight: 'bold', color: msg.is_anonymous ? '#999' : '#DB7093', marginBottom: 2 }}>
-                    {msg.display_name}
-                  </Text>
-                )}
-                <Text style={{ color: isMine ? '#fff' : '#333', fontSize: 14 }}>{msg.message}</Text>
-              </View>
-            );
+  const isMine = currentUser && msg.user_id === currentUser.id;
+
+  const messageTime = msg.created_at
+    ? new Date(msg.created_at).toLocaleTimeString('tr-TR', {
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : '';
+
+  return (
+    <View
+      style={{
+        alignSelf: isMine ? 'flex-end' : 'flex-start',
+        backgroundColor: isMine ? '#FF69B4' : '#F3F3F3',
+        borderRadius: 14,
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        marginBottom: 8,
+        maxWidth: '78%',
+      }}
+    >
+      {!isMine && (
+        <Text
+          style={{
+            fontSize: 11,
+            fontWeight: 'bold',
+            color: msg.is_anonymous ? '#999' : '#DB7093',
+            marginBottom: 2,
           }}
+        >
+          {msg.display_name}
+        </Text>
+      )}
+
+      <Text
+        style={{
+          color: isMine ? '#fff' : '#333',
+          fontSize: 14,
+        }}
+      >
+        {msg.message}
+      </Text>
+
+      <Text
+        style={{
+          color: isMine ? '#FFE4E1' : '#999',
+          fontSize: 10,
+          textAlign: 'right',
+          marginTop: 4,
+        }}
+      >
+        {messageTime}
+      </Text>
+    </View>
+  );
+}}
         />
       )}
 
