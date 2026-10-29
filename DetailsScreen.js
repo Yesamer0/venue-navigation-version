@@ -15,6 +15,7 @@ import * as Location from 'expo-location';
 import { supabase } from './supabase'; 
 import { styles } from './styles';
 import { useFocusEffect } from '@react-navigation/native';
+import VenueMoments from './VenueMoments';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 
@@ -1319,6 +1320,12 @@ const taggedPhotos = venuePhotos.filter(
       {/* Ana Sekmeler: Menü & Galeri / Yorumlar & Etiketler / Sohbet */}
       <View style={{ flexDirection: 'row', paddingHorizontal: 20, gap: 10, marginBottom: 15 }}>
         <TouchableOpacity
+          style={{ flex: 1, paddingVertical: 10, borderRadius: 12, alignItems: 'center', backgroundColor: activeMainTab === 'photos' ? '#FF69B4' : '#F3F3F3' }}
+          onPress={() => setActiveMainTab('photos')}
+        >
+          <Text style={{ color: activeMainTab === 'photos' ? '#fff' : '#666', fontWeight: 'bold' }}>Fotoğraflar</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
           style={{
             flex: 1, paddingVertical: 10, borderRadius: 12, alignItems: 'center',
             backgroundColor: activeMainTab === 'menu' ? '#FF69B4' : '#F3F3F3',
@@ -1348,7 +1355,9 @@ const taggedPhotos = venuePhotos.filter(
       </View>
 
       {/* ===== İÇERİK ===== */}
-      {activeMainTab === 'menu' ? (
+      <VenueMoments venue={item} isCheckedIn={isCheckedIn} navigation={navigation}
+        showFeed={activeMainTab === 'photos'} onShowPhotos={() => setActiveMainTab('photos')} />
+      {activeMainTab === 'photos' ? null : activeMainTab === 'menu' ? (
         <View style={{ paddingHorizontal: 20 }}>
 
           <View style={{ flexDirection: 'row', gap: 10, marginBottom: 15 }}>

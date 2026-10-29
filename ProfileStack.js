@@ -5,6 +5,8 @@ import ProfileOrVenueScreen from './ProfileOrVenueScreen';
 import DetailsScreen from './DetailsScreen';
 import AddVenueScreen from './AddVenueScreen';
 import VenueChatScreen from './VenueChatScreen';
+import PublicProfileScreen from './PublicProfileScreen';
+import MomentPhotoScreen from './MomentPhotoScreen';
 
 const Stack = createStackNavigator();
 
@@ -22,6 +24,8 @@ export default function ProfileStack() {
       }}
     >
       <Stack.Screen name="ProfileMain" component={ProfileOrVenueScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="PublicProfile" component={PublicProfileScreen} options={{ title: 'Profil' }} />
+      <Stack.Screen name="MomentPhoto" component={MomentPhotoScreen} options={{ title: 'Fotoğraf' }} />
       <Stack.Screen name="Details" component={DetailsScreen} options={{ headerShown: false }} />
       <Stack.Screen name="AddVenue" component={AddVenueScreen} options={{ headerShown: true, title: 'Yeni Mekan Ekle' }} />
       <Stack.Screen name="VenueChat" component={VenueChatScreen} options={{ headerShown: true, title: 'Sohbet' }} />
