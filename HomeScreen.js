@@ -1,14 +1,47 @@
-import React, { useState, useEffect, useRef } from 'react';import { View, Text, FlatList, TouchableOpacity, Image, ActivityIndicator, SafeAreaView, TextInput } from 'react-native';
+
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  View,
+  Text,
+  FlatList,
+  TouchableOpacity,
+  Image,
+  ActivityIndicator,
+  SafeAreaView,
+  TextInput,
+  ScrollView,
+  StyleSheet,
+} from 'react-native';
 import * as Location from 'expo-location';
 import MapView, { Marker } from 'react-native-maps';
-import { supabase } from './supabase'; 
+import { supabase } from './supabase';
 import { styles } from './styles';
+
+const COLORS = {
+  background: '#FFF9FC',
+  pinkLight: '#FFEAF2',
+  pinkSoft: '#FDE4EE',
+  pinkBorder: '#F4B4CB',
+  pink: '#C2185B',
+  pinkDark: '#9B1B4D',
+  muted: '#B37690',
+  white: '#FFFFFF',
+};
 
 const PRICE_LEVELS = ['₺', '₺₺', '₺₺₺'];
 
+const CATEGORIES = [
+  { name: 'Hepsi', icon: '✨' },
+  { name: 'Kafe', icon: '☕' },
+  { name: 'Restoran', icon: '🍽️' },
+  { name: 'Bar', icon: '🍹' },
+  { name: 'Etkinlik', icon: '🎉' },
+];
+
+const MAP_HEIGHTS = [120, 180, 260];
+
 const calculateDistance = (lat1, lon1, lat2, lon2) => {
   const R = 6371;
-
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
   const dLon = ((lon2 - lon1) * Math.PI) / 180;
 
@@ -19,9 +52,7 @@ const calculateDistance = (lat1, lon1, lat2, lon2) => {
       Math.sin(dLon / 2) *
       Math.sin(dLon / 2);
 
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-  return R * c;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 };
 
 export default function HomeScreen({ navigation }) {
@@ -30,20 +61,19 @@ export default function HomeScreen({ navigation }) {
   const [selectedCategory, setSelectedCategory] = useState('Hepsi');
   const [searchQuery, setSearchQuery] = useState('');
 
-  const categories = ['Hepsi', 'Kafe', 'Restoran', 'Bar', 'Etkinlik'];
-
-  // Özellik / fiyat filtreleri
   const [filterWifi, setFilterWifi] = useState(false);
   const [filterOutdoor, setFilterOutdoor] = useState(false);
   const [selectedPriceLevels, setSelectedPriceLevels] = useState([]);
 
-  // Sıralama
-  const [sortMode, setSortMode] = useState('default'); // 'default' | 'rating' | 'distance'
+  const [sortMode, setSortMode] = useState('default');
   const [venueRatings, setVenueRatings] = useState({});
   const [userLocation, setUserLocation] = useState(null);
   const [loadingLocation, setLoadingLocation] = useState(false);
+
+  const [mapSizeIndex, setMapSizeIndex] = useState(1);
+  const [mapVisible, setMapVisible] = useState(true);
+
   const mapRef = useRef(null);
-  
 
   useEffect(() => {
     fetchVenues();
@@ -53,11 +83,16 @@ export default function HomeScreen({ navigation }) {
   const fetchVenues = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase.from('venues').select('*');
+
+      const { data, error } = await supabase
+        .from('venues')
+        .select('*');
+
       if (error) throw error;
+
       setVenues(data || []);
-    } catch (err) {
-      console.error("Mekan çekme hatası:", err.message);
+    } catch (error) {
+      console.log('Venue fetch error:', error);
     } finally {
       setLoading(false);
     }
@@ -69,413 +104,876 @@ export default function HomeScreen({ navigation }) {
       .select('venue_id, rating');
 
     if (error) {
-      console.log('Puan ortalaması çekme hatası:', error);
+      console.log('Rating fetch error:', error);
       return;
     }
 
     const totals = {};
     const counts = {};
-    (data || []).forEach((r) => {
-      if (!totals[r.venue_id]) {
-        totals[r.venue_id] = 0;
-        counts[r.venue_id] = 0;
+
+    (data || []).forEach((review) => {
+      const id = review.venue_id;
+
+      if (!totals[id]) {
+        totals[id] = 0;
+        counts[id] = 0;
       }
-      totals[r.venue_id] += r.rating;
-      counts[r.venue_id] += 1;
+
+      totals[id] += review.rating;
+      counts[id] += 1;
     });
 
     const averages = {};
-    Object.keys(totals).forEach((venueId) => {
-      averages[venueId] = totals[venueId] / counts[venueId];
+
+    Object.keys(totals).forEach((id) => {
+      averages[id] = totals[id] / counts[id];
     });
 
     setVenueRatings(averages);
   };
 
   const togglePriceLevel = (level) => {
-    setSelectedPriceLevels((prev) =>
-      prev.includes(level) ? prev.filter((l) => l !== level) : [...prev, level]
+    setSelectedPriceLevels((previous) =>
+      previous.includes(level)
+        ? previous.filter((item) => item !== level)
+        : [...previous, level]
     );
   };
-  const goToMyLocation = async () => {
-  try {
-    let location = userLocation;
 
-    if (!location) {
-      const { status } = await Location.requestForegroundPermissionsAsync();
+  const goToMyLocation = async () => {
+    try {
+      let location = userLocation;
+
+      if (!location) {
+        const { status } =
+          await Location.requestForegroundPermissionsAsync();
+
+        if (status !== 'granted') {
+          alert('Konumunu göstermek için konum izni vermelisin.');
+          return;
+        }
+
+        const currentLocation =
+          await Location.getCurrentPositionAsync({});
+
+        location = {
+          latitude: currentLocation.coords.latitude,
+          longitude: currentLocation.coords.longitude,
+        };
+
+        setUserLocation(location);
+      }
+
+      mapRef.current?.animateToRegion(
+        {
+          latitude: location.latitude,
+          longitude: location.longitude,
+          latitudeDelta: 0.01,
+          longitudeDelta: 0.01,
+        },
+        1000
+      );
+    } catch (error) {
+      alert('Konum alınamadı: ' + error.message);
+    }
+  };
+
+  const handleSelectSort = async (mode) => {
+    if (mode !== 'distance') {
+      setSortMode(mode);
+      return;
+    }
+
+    try {
+      setLoadingLocation(true);
+
+      const { status } =
+        await Location.requestForegroundPermissionsAsync();
 
       if (status !== 'granted') {
-        alert('Konumunu gösterebilmek için konum izni vermelisin.');
+        alert('Yakınlığa göre sıralamak için konum izni vermelisin.');
         return;
       }
 
-      const currentLocation = await Location.getCurrentPositionAsync({});
+      const location = await Location.getCurrentPositionAsync({});
 
-      location = {
-        latitude: currentLocation.coords.latitude,
-        longitude: currentLocation.coords.longitude,
-      };
+      setUserLocation({
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+      });
 
-      setUserLocation(location);
-    }
-
-    mapRef.current?.animateToRegion(
-      {
-        latitude: location.latitude,
-        longitude: location.longitude,
-        latitudeDelta: 0.01,
-        longitudeDelta: 0.01,
-      },
-      1000
-    );
-  } catch (err) {
-    alert('Konum alınamadı: ' + err.message);
-  }
-};
-  const handleSelectSort = async (mode) => {
-    if (mode === 'distance') {
-      try {
-        setLoadingLocation(true);
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') {
-          alert('Yakınlığa göre sıralamak için konum izni vermelisiniz.');
-          setLoadingLocation(false);
-          return;
-        }
-        const loc = await Location.getCurrentPositionAsync({});
-        setUserLocation({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
-        setSortMode('distance');
-      } catch (err) {
-        alert('Konum alınamadı: ' + err.message);
-      } finally {
-        setLoadingLocation(false);
-      }
-    } else {
-      setSortMode(mode);
+      setSortMode('distance');
+    } catch (error) {
+      alert('Konum alınamadı: ' + error.message);
+    } finally {
+      setLoadingLocation(false);
     }
   };
 
-  // Kategori + arama + özellik + fiyat filtrelerini uygula, sonra seçilen moda göre sırala
-  let filteredVenues = selectedCategory === 'Hepsi' 
-    ? venues 
-    : venues.filter(v => v.category === selectedCategory);
+  const resetFilters = () => {
+    setSelectedCategory('Hepsi');
+    setSearchQuery('');
+    setFilterWifi(false);
+    setFilterOutdoor(false);
+    setSelectedPriceLevels([]);
+    setSortMode('default');
+  };
+
+  let filteredVenues =
+    selectedCategory === 'Hepsi'
+      ? venues
+      : venues.filter((venue) => venue.category === selectedCategory);
 
   if (searchQuery.trim()) {
-    const q = searchQuery.trim().toLowerCase();
+    const query = searchQuery.trim().toLowerCase();
+
     filteredVenues = filteredVenues.filter(
-      (v) => v.name?.toLowerCase().includes(q) || v.location?.toLowerCase().includes(q)
+      (venue) =>
+        venue.name?.toLowerCase().includes(query) ||
+        venue.location?.toLowerCase().includes(query)
     );
   }
 
   if (filterWifi) {
-    filteredVenues = filteredVenues.filter((v) => v.has_wifi === true);
+    filteredVenues = filteredVenues.filter(
+      (venue) => venue.has_wifi === true
+    );
   }
+
   if (filterOutdoor) {
-    filteredVenues = filteredVenues.filter((v) => v.is_outdoor === true);
+    filteredVenues = filteredVenues.filter(
+      (venue) => venue.is_outdoor === true
+    );
   }
+
   if (selectedPriceLevels.length > 0) {
-    filteredVenues = filteredVenues.filter((v) => selectedPriceLevels.includes(v.price_level));
+    filteredVenues = filteredVenues.filter((venue) =>
+      selectedPriceLevels.includes(venue.price_level)
+    );
   }
 
   if (sortMode === 'rating') {
     filteredVenues = [...filteredVenues].sort(
-      (a, b) => (venueRatings[b.id] || 0) - (venueRatings[a.id] || 0)
+      (a, b) =>
+        (venueRatings[b.id] || 0) - (venueRatings[a.id] || 0)
     );
   } else if (sortMode === 'distance' && userLocation) {
-  filteredVenues = [...filteredVenues]
-    .filter((v) => v.latitude != null && v.longitude != null)
-    .sort((a, b) => {
-      const distA = calculateDistance(
-        userLocation.latitude,
-        userLocation.longitude,
-        a.latitude,
-        a.longitude
-      );
-
-      const distB = calculateDistance(
-        userLocation.latitude,
-        userLocation.longitude,
-        b.latitude,
-        b.longitude
-      );
-
-      return distA - distB;
-    });
-}
-
-  if (loading) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }}>
-        <ActivityIndicator size="large" color="#D8A7B1" />
-      </View>
-    );
-  }
-
-  return (
-    <SafeAreaView style={styles.container}>
-      {/* Başlık */}
-      <View style={{ alignItems: 'center', paddingTop: 18, paddingBottom: 4, backgroundColor: '#FFEAF2' }}>
-        <Text
-          style={{
-            fontFamily: 'Chewy_400Regular',
-            fontSize: 34,
-            color: '#9B1B4D',
-            textShadowColor: '#fff',
-            textShadowOffset: { width: 0, height: 1 },
-            textShadowRadius: 1,
-          }}
-        >
-          Nereye Gitsek? 🌸
-        </Text>
-      </View>
-
-      {/* Arama Çubuğu — küçük ve ortalanmış */}
-      <View style={{ alignItems: 'center', marginTop: 10, marginBottom: 12, backgroundColor: '#FFEAF2', paddingBottom: 14 }}>
-        <View
-          style={{
-            flexDirection: 'row', alignItems: 'center',
-            backgroundColor: '#fff', borderRadius: 18,
-            borderWidth: 1.5, borderColor: '#F4B4CB',
-            paddingHorizontal: 14, height: 34,
-            width: '55%', minWidth: 190,
-          }}
-        >
-          <Text style={{ fontSize: 12, marginRight: 6, color: '#C2185B' }}>🔍</Text>
-          <TextInput
-            style={{ flex: 1, fontSize: 12, color: '#7A2140', padding: 0, textAlign: 'center' }}
-            placeholder="Mekan ara..."
-            placeholderTextColor="#D999B5"
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            autoCapitalize="none"
-          />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
-              <Text style={{ color: '#D999B5', fontSize: 12, paddingHorizontal: 2 }}>✕</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
-
-      {/* Kategori Sekmeleri */}
-      <View style={{ height: 54 }}>
-        <FlatList
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 15, alignItems: 'center', gap: 8 }}
-          data={categories}
-          keyExtractor={(item) => item}
-          renderItem={({ item }) => {
-            const isActive = selectedCategory === item;
-            return (
-              <TouchableOpacity 
-                style={{
-                  paddingVertical: 9, paddingHorizontal: 18, borderRadius: 20,
-                  backgroundColor: isActive ? '#C2185B' : '#fff',
-                  borderWidth: 1.5, borderColor: isActive ? '#C2185B' : '#F4B4CB',
-                }}
-                onPress={() => setSelectedCategory(item)}
-              >
-                <Text style={{ color: isActive ? '#fff' : '#9B1B4D', fontWeight: '700', fontSize: 13 }}>
-                  {item}
-                </Text>
-              </TouchableOpacity>
-            );
-          }}
-        />
-      </View>
-
-      {/* Özellik / Fiyat Filtreleri */}
-      <View style={{ height: 46, marginBottom: 4 }}>
-        <FlatList
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 15, alignItems: 'center', gap: 8 }}
-          data={[
-            { key: 'wifi', label: '📶 Wi-Fi', active: filterWifi, onPress: () => setFilterWifi(!filterWifi) },
-            { key: 'outdoor', label: '🌳 Açık Alan', active: filterOutdoor, onPress: () => setFilterOutdoor(!filterOutdoor) },
-            ...PRICE_LEVELS.map((level) => ({
-              key: `price-${level}`,
-              label: level,
-              active: selectedPriceLevels.includes(level),
-              onPress: () => togglePriceLevel(level),
-            })),
-          ]}
-          keyExtractor={(item) => item.key}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              onPress={item.onPress}
-              style={{
-                paddingVertical: 7,
-                paddingHorizontal: 14,
-                borderRadius: 16,
-                borderWidth: 1.5,
-                borderColor: item.active ? '#C2185B' : '#F4B4CB',
-                backgroundColor: item.active ? '#FDE4EE' : '#fff',
-              }}
-            >
-              <Text style={{ color: item.active ? '#9B1B4D' : '#B37690', fontWeight: '700', fontSize: 13 }}>
-                {item.label}
-              </Text>
-            </TouchableOpacity>
-          )}
-        />
-      </View>
-
-      {/* Sıralama */}
-      <View style={{ height: 46, marginBottom: 8 }}>
-        <FlatList
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 15, alignItems: 'center', gap: 8 }}
-          data={[
-            { key: 'default', label: 'Varsayılan' },
-            { key: 'rating', label: '⭐ Puana Göre' },
-            { key: 'distance', label: '📍 Bana Yakına Göre' },
-          ]}
-          keyExtractor={(item) => item.key}
-          renderItem={({ item }) => {
-            const isActive = sortMode === item.key;
-            const isLoadingThis = item.key === 'distance' && loadingLocation;
-            return (
-              <TouchableOpacity
-                onPress={() => handleSelectSort(item.key)}
-                style={{
-                  paddingVertical: 7,
-                  paddingHorizontal: 14,
-                  borderRadius: 16,
-                  backgroundColor: isActive ? '#C2185B' : '#fff',
-                  borderWidth: 1.5,
-                  borderColor: isActive ? '#C2185B' : '#F4B4CB',
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                }}
-              >
-                {isLoadingThis && <ActivityIndicator size="small" color="#fff" style={{ marginRight: 6 }} />}
-                <Text style={{ color: isActive ? '#fff' : '#B37690', fontWeight: '700', fontSize: 13 }}>
-                  {item.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          }}
-        />
-      </View>
-
-      <View
-  style={{
-    height: 250,
-    marginHorizontal: 15,
-    marginBottom: 15,
-    borderRadius: 20,
-    overflow: 'hidden',
-    position: 'relative',
-  }}
->
-  <MapView
-    ref={mapRef}
-    style={{ flex: 1 }}
-    initialRegion={{
-      latitude: 37.2153,
-      longitude: 28.3636,
-      latitudeDelta: 0.05,
-      longitudeDelta: 0.05,
-    }}
-  >
-    {filteredVenues
+    filteredVenues = [...filteredVenues]
       .filter(
         (venue) =>
           venue.latitude != null &&
           venue.longitude != null
       )
-      .map((venue) => (
-        <Marker
-          key={venue.id}
-          coordinate={{
-            latitude: Number(venue.latitude),
-            longitude: Number(venue.longitude),
-          }}
-          title={venue.name}
-          description={venue.location}
-          onPress={() =>
-            navigation.navigate('Details', { item: venue })
-          }
-        />
-      ))}
-  </MapView>
+      .sort((a, b) => {
+        const distanceA = calculateDistance(
+          userLocation.latitude,
+          userLocation.longitude,
+          Number(a.latitude),
+          Number(a.longitude)
+        );
 
-  <TouchableOpacity
-    onPress={goToMyLocation}
-    style={{
-      position: 'absolute',
-      right: 12,
-      bottom: 12,
-      backgroundColor: '#fff',
-      paddingVertical: 9,
-      paddingHorizontal: 12,
-      borderRadius: 18,
-      elevation: 4,
-      zIndex: 10,
-    }}
-  >
-    <Text
-      style={{
-        color: '#9B1B4D',
-        fontWeight: '700',
-        fontSize: 12,
-      }}
+        const distanceB = calculateDistance(
+          userLocation.latitude,
+          userLocation.longitude,
+          Number(b.latitude),
+          Number(b.longitude)
+        );
+
+        return distanceA - distanceB;
+      });
+  }
+
+  const mapVenues = filteredVenues.filter(
+    (venue) =>
+      venue.latitude != null &&
+      venue.longitude != null &&
+      Number.isFinite(Number(venue.latitude)) &&
+      Number.isFinite(Number(venue.longitude))
+  );
+
+  const featureFilters = [
+    {
+      key: 'wifi',
+      label: '📶 Wi-Fi',
+      active: filterWifi,
+      onPress: () => setFilterWifi((value) => !value),
+    },
+    {
+      key: 'outdoor',
+      label: '🌿 Açık Alan',
+      active: filterOutdoor,
+      onPress: () => setFilterOutdoor((value) => !value),
+    },
+    ...PRICE_LEVELS.map((level) => ({
+      key: `price-${level}`,
+      label: level,
+      active: selectedPriceLevels.includes(level),
+      onPress: () => togglePriceLevel(level),
+    })),
+  ];
+
+  const sortOptions = [
+    { key: 'default', label: 'Önerilen' },
+    { key: 'rating', label: '⭐ En yüksek puan' },
+    { key: 'distance', label: '📍 En yakın' },
+  ];
+
+  const renderHeader = () => (
+    <View>
+      <View style={localStyles.header}>
+        <Text style={localStyles.brand}>VENUE · MEKSO</Text>
+        <Text style={localStyles.subtitle}>
+          Keşfet · Deneyimle · Paylaş
+        </Text>
+      </View>
+
+      <View style={localStyles.searchSection}>
+        <View style={localStyles.searchBar}>
+          <Text style={localStyles.searchIcon}>⌕</Text>
+
+          <TextInput
+            style={localStyles.searchInput}
+            placeholder="Mekân veya konum ara..."
+            placeholderTextColor="#B88A9D"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoCapitalize="none"
+            returnKeyType="search"
+          />
+
+          {searchQuery.length > 0 && (
+            <TouchableOpacity
+              onPress={() => setSearchQuery('')}
+              style={localStyles.clearButton}
+            >
+              <Text style={localStyles.clearText}>✕</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+
+      <View style={localStyles.section}>
+        <Text style={localStyles.sectionTitle}>
+          Ne keşfetmek istersin?
+        </Text>
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={localStyles.horizontalContent}
+        >
+          {CATEGORIES.map((category) => {
+            const active = selectedCategory === category.name;
+
+            return (
+              <TouchableOpacity
+                key={category.name}
+                onPress={() => setSelectedCategory(category.name)}
+                style={[
+                  localStyles.categoryButton,
+                  active && localStyles.categoryButtonActive,
+                ]}
+              >
+                <Text style={localStyles.categoryIcon}>
+                  {category.icon}
+                </Text>
+
+                <Text
+                  style={[
+                    localStyles.categoryText,
+                    active && localStyles.categoryTextActive,
+                  ]}
+                >
+                  {category.name}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
+
+      <View style={localStyles.section}>
+        <View style={localStyles.sectionHeadingRow}>
+          <Text style={localStyles.sectionTitle}>Filtreler</Text>
+
+          <TouchableOpacity onPress={resetFilters}>
+            <Text style={localStyles.resetText}>Temizle</Text>
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={localStyles.horizontalContent}
+        >
+          {featureFilters.map((filter) => (
+            <TouchableOpacity
+              key={filter.key}
+              onPress={filter.onPress}
+              style={[
+                localStyles.filterButton,
+                filter.active && localStyles.filterButtonActive,
+              ]}
+            >
+              <Text
+                style={[
+                  localStyles.filterText,
+                  filter.active && localStyles.filterTextActive,
+                ]}
+              >
+                {filter.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+
+      <View style={localStyles.section}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={localStyles.horizontalContent}
+        >
+          {sortOptions.map((option) => {
+            const active = sortMode === option.key;
+            const isLoading =
+              option.key === 'distance' && loadingLocation;
+
+            return (
+              <TouchableOpacity
+                key={option.key}
+                onPress={() => handleSelectSort(option.key)}
+                disabled={isLoading}
+                style={[
+                  localStyles.sortButton,
+                  active && localStyles.sortButtonActive,
+                ]}
+              >
+                {isLoading && (
+                  <ActivityIndicator
+                    size="small"
+                    color={active ? '#FFFFFF' : COLORS.pink}
+                    style={{ marginRight: 5 }}
+                  />
+                )}
+
+                <Text
+                  style={[
+                    localStyles.sortText,
+                    active && localStyles.sortTextActive,
+                  ]}
+                >
+                  {option.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
+
+      <View style={localStyles.mapSection}>
+        <View style={localStyles.mapHeading}>
+          <View>
+            <Text style={localStyles.sectionTitle}>
+              Haritada keşfet
+            </Text>
+            <Text style={localStyles.mapSubtitle}>
+              Yakınındaki mekânları incele
+            </Text>
+          </View>
+
+          <TouchableOpacity
+            onPress={() => setMapVisible((value) => !value)}
+            style={localStyles.mapToggle}
+          >
+            <Text style={localStyles.mapToggleText}>
+              {mapVisible ? 'Gizle −' : 'Göster +'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {mapVisible && (
+          <>
+            <View style={localStyles.mapControls}>
+              <TouchableOpacity
+                onPress={() =>
+                  setMapSizeIndex((index) => Math.max(0, index - 1))
+                }
+                disabled={mapSizeIndex === 0}
+                style={[
+                  localStyles.mapSizeButton,
+                  mapSizeIndex === 0 && localStyles.disabledButton,
+                ]}
+              >
+                <Text style={localStyles.mapSizeText}>− Küçült</Text>
+              </TouchableOpacity>
+
+              <Text style={localStyles.mapSizeLabel}>
+                {['Küçük', 'Orta', 'Büyük'][mapSizeIndex]}
+              </Text>
+
+              <TouchableOpacity
+                onPress={() =>
+                  setMapSizeIndex((index) => Math.min(2, index + 1))
+                }
+                disabled={mapSizeIndex === 2}
+                style={[
+                  localStyles.mapSizeButton,
+                  mapSizeIndex === 2 && localStyles.disabledButton,
+                ]}
+              >
+                <Text style={localStyles.mapSizeText}>+ Büyüt</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View
+              style={[
+                localStyles.mapContainer,
+                { height: MAP_HEIGHTS[mapSizeIndex] },
+              ]}
+            >
+              <MapView
+                ref={mapRef}
+                style={{ width: '100%', height: '100%' }}
+                initialRegion={{
+                  latitude: 37.2153,
+                  longitude: 28.3636,
+                  latitudeDelta: 0.05,
+                  longitudeDelta: 0.05,
+                }}
+              >
+                {mapVenues.map((venue) => (
+                  <Marker
+                    key={venue.id}
+                    coordinate={{
+                      latitude: Number(venue.latitude),
+                      longitude: Number(venue.longitude),
+                    }}
+                    title={venue.name}
+                    description={venue.location}
+                    onPress={() =>
+                      navigation.navigate('Details', { item: venue })
+                    }
+                  />
+                ))}
+              </MapView>
+
+              <TouchableOpacity
+                onPress={goToMyLocation}
+                style={localStyles.locationButton}
+              >
+                <Text style={localStyles.locationButtonText}>
+                  📍 Konumum
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
+      </View>
+
+      <View style={localStyles.resultsHeading}>
+        <Text style={localStyles.sectionTitle}>
+          Senin için mekânlar
+        </Text>
+
+        <Text style={localStyles.resultsCount}>
+          {filteredVenues.length} mekân
+        </Text>
+      </View>
+    </View>
+  );
+
+  const renderVenue = ({ item }) => (
+    <TouchableOpacity
+      style={styles.card}
+      onPress={() => navigation.navigate('Details', { item })}
     >
-      📍 Konumuma Git
-    </Text>
-  </TouchableOpacity>
-</View>
+      <Image
+        source={{ uri: item.image_url }}
+        style={styles.image}
+      />
 
+      <View style={styles.cardContent}>
+        <Text style={styles.venueName}>{item.name}</Text>
+
+        <Text style={styles.venueLocation}>
+          {item.location}
+        </Text>
+
+        {userLocation &&
+          item.latitude != null &&
+          item.longitude != null && (
+            <Text style={localStyles.distanceText}>
+              📍{' '}
+              {calculateDistance(
+                userLocation.latitude,
+                userLocation.longitude,
+                Number(item.latitude),
+                Number(item.longitude)
+              ).toFixed(1)}{' '}
+              km uzakta
+            </Text>
+          )}
+
+        {venueRatings[item.id] != null && (
+          <Text style={localStyles.ratingText}>
+            ⭐ {venueRatings[item.id].toFixed(1)}
+          </Text>
+        )}
+      </View>
+    </TouchableOpacity>
+  );
+
+  if (loading) {
+    return (
+      <View style={localStyles.loadingContainer}>
+        <ActivityIndicator size="large" color={COLORS.pink} />
+        <Text style={localStyles.loadingText}>
+          Mekânlar yükleniyor...
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <SafeAreaView style={localStyles.container}>
       <FlatList
         data={filteredVenues}
         keyExtractor={(item) => item.id.toString()}
-        contentContainerStyle={{ paddingBottom: 20 }}
+        renderItem={renderVenue}
+        ListHeaderComponent={renderHeader}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={localStyles.listContent}
         ListEmptyComponent={
-          <View style={{ padding: 30, alignItems: 'center' }}>
-            <Text style={{ color: '#999', textAlign: 'center' }}>
-              Bu filtrelere uygun mekan bulunamadı. Filtreleri değiştirmeyi dene.
+          <View style={localStyles.emptyContainer}>
+            <Text style={localStyles.emptyTitle}>
+              Henüz mekân bulunamadı
             </Text>
+
+            <Text style={localStyles.emptyDescription}>
+              Filtrelerini değiştirmeyi veya arama kelimeni
+              düzenlemeyi deneyebilirsin.
+            </Text>
+
+            <TouchableOpacity
+              onPress={resetFilters}
+              style={localStyles.emptyResetButton}
+            >
+              <Text style={localStyles.emptyResetText}>
+                Filtreleri temizle
+              </Text>
+            </TouchableOpacity>
           </View>
         }
-        renderItem={({ item }) => (
-          <TouchableOpacity 
-            style={styles.card}
-            onPress={() => navigation.navigate('Details', { item })}
-          >
-            <Image source={{ uri: item.image_url }} style={styles.image} />
-            <View style={styles.cardContent}>
-              <Text style={styles.venueName}>{item.name}</Text>
-              <Text style={styles.venueLocation}>{item.location}</Text>
-              {userLocation &&
-  item.latitude != null &&
-  item.longitude != null && (
-    <Text
-      style={{
-        color: '#B37690',
-        fontSize: 12,
-        marginTop: 3,
-      }}
-    >
-      📍 {calculateDistance(
-        userLocation.latitude,
-        userLocation.longitude,
-        item.latitude,
-        item.longitude
-      ).toFixed(1)} km uzakta
-    </Text>
-  )}
-              {venueRatings[item.id] != null && (
-                <Text style={{ color: '#C2185B', fontSize: 13, fontWeight: '700', marginTop: 2 }}>
-                  ⭐ {venueRatings[item.id].toFixed(1)}
-                </Text>
-              )}
-            </View>
-          </TouchableOpacity>
-        )}
       />
     </SafeAreaView>
   );
 }
+
+const localStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.background,
+  },
+  loadingText: {
+    marginTop: 12,
+    color: COLORS.muted,
+    fontSize: 13,
+  },
+  listContent: {
+    paddingBottom: 30,
+  },
+  header: {
+    backgroundColor: COLORS.pinkLight,
+    alignItems: 'center',
+    paddingTop: 20,
+    paddingBottom: 12,
+    paddingHorizontal: 16,
+  },
+  brand: {
+    fontFamily: 'Chewy_400Regular',
+    fontSize: 34,
+    color: COLORS.pinkDark,
+    letterSpacing: 1,
+    textAlign: 'center',
+  },
+  subtitle: {
+    marginTop: 3,
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 1.5,
+    color: COLORS.muted,
+  },
+  searchSection: {
+    backgroundColor: COLORS.pinkLight,
+    paddingHorizontal: 18,
+    paddingBottom: 18,
+  },
+  searchBar: {
+    height: 48,
+    borderRadius: 17,
+    borderWidth: 1,
+    borderColor: COLORS.pinkBorder,
+    backgroundColor: COLORS.white,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    shadowColor: '#9B1B4D',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.07,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  searchIcon: {
+    fontSize: 27,
+    color: COLORS.pink,
+    marginRight: 10,
+    marginTop: -3,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: COLORS.pinkDark,
+    paddingVertical: 0,
+  },
+  clearButton: {
+    padding: 7,
+  },
+  clearText: {
+    color: COLORS.muted,
+    fontSize: 14,
+  },
+  section: {
+    marginTop: 17,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: COLORS.pinkDark,
+  },
+  sectionHeadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 18,
+    marginBottom: 10,
+  },
+  horizontalContent: {
+    paddingHorizontal: 18,
+    alignItems: 'center',
+    gap: 9,
+    paddingVertical: 3,
+  },
+  categoryButton: {
+    backgroundColor: COLORS.white,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: COLORS.pinkBorder,
+    paddingHorizontal: 16,
+    paddingVertical: 11,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
+  categoryButtonActive: {
+    backgroundColor: COLORS.pink,
+    borderColor: COLORS.pink,
+  },
+  categoryIcon: {
+    fontSize: 15,
+  },
+  categoryText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.pinkDark,
+  },
+  categoryTextActive: {
+    color: COLORS.white,
+  },
+  filterButton: {
+    backgroundColor: COLORS.white,
+    borderWidth: 1,
+    borderColor: COLORS.pinkBorder,
+    borderRadius: 15,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+  },
+  filterButtonActive: {
+    backgroundColor: COLORS.pinkSoft,
+    borderColor: COLORS.pink,
+  },
+  filterText: {
+    color: COLORS.muted,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  filterTextActive: {
+    color: COLORS.pinkDark,
+  },
+  resetText: {
+    color: COLORS.pink,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  sortButton: {
+    backgroundColor: COLORS.white,
+    borderWidth: 1,
+    borderColor: COLORS.pinkBorder,
+    borderRadius: 15,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  sortButtonActive: {
+    backgroundColor: COLORS.pink,
+    borderColor: COLORS.pink,
+  },
+  sortText: {
+    color: COLORS.muted,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  sortTextActive: {
+    color: COLORS.white,
+  },
+  mapSection: {
+    marginTop: 20,
+    marginHorizontal: 16,
+  },
+  mapHeading: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  mapSubtitle: {
+    fontSize: 11,
+    color: COLORS.muted,
+    marginTop: 3,
+  },
+  mapToggle: {
+    backgroundColor: COLORS.pinkSoft,
+    paddingHorizontal: 13,
+    paddingVertical: 8,
+    borderRadius: 13,
+  },
+  mapToggleText: {
+    color: COLORS.pinkDark,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  mapControls: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  mapSizeButton: {
+    backgroundColor: COLORS.white,
+    borderWidth: 1,
+    borderColor: COLORS.pinkBorder,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+  },
+  disabledButton: {
+    opacity: 0.4,
+  },
+  mapSizeText: {
+    color: COLORS.pinkDark,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  mapSizeLabel: {
+    fontSize: 12,
+    color: COLORS.muted,
+    fontWeight: '600',
+  },
+  mapContainer: {
+    borderRadius: 19,
+    overflow: 'hidden',
+    backgroundColor: COLORS.pinkSoft,
+    position: 'relative',
+  },
+  locationButton: {
+    position: 'absolute',
+    right: 10,
+    bottom: 10,
+    backgroundColor: COLORS.white,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 13,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOpacity: 0.12,
+    shadowRadius: 5,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  locationButtonText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.pinkDark,
+  },
+  resultsHeading: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginHorizontal: 18,
+    marginTop: 24,
+    marginBottom: 13,
+  },
+  resultsCount: {
+    color: COLORS.muted,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  distanceText: {
+    color: COLORS.muted,
+    fontSize: 12,
+    marginTop: 3,
+  },
+  ratingText: {
+    color: COLORS.pink,
+    fontSize: 13,
+    fontWeight: '700',
+    marginTop: 3,
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    paddingHorizontal: 30,
+    paddingVertical: 35,
+  },
+  emptyTitle: {
+    color: COLORS.pinkDark,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  emptyDescription: {
+    color: COLORS.muted,
+    fontSize: 13,
+    textAlign: 'center',
+    marginTop: 8,
+    lineHeight: 20,
+  },
+  emptyResetButton: {
+    backgroundColor: COLORS.pink,
+    borderRadius: 14,
+    paddingHorizontal: 18,
+    paddingVertical: 11,
+    marginTop: 16,
+  },
+  emptyResetText: {
+    color: COLORS.white,
+    fontWeight: '700',
+    fontSize: 13,
+  },
+});
