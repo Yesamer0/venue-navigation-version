@@ -12,22 +12,12 @@ import {
   ActivityIndicator,
   Image // EKLENDİ: Fotoğrafları göstermek için
 } from 'react-native';
-import * as Location from 'expo-location'; 
-import * as ImagePicker from 'expo-image-picker'; // EKLENDİ: Görsel seçici kütüphane
 import { supabase } from './supabase';
+import MomentFeed from './MomentFeed';
 
 export default function ProfileScreen({ navigation }) {
   const [username, setUsername] = useState('Kullanıcı');
-  const [postText, setPostText] = useState('');
-  const [locationText, setLocationText] = useState('');
-  const [isLocationFocused, setIsLocationFocused] = useState(false);
-  
-  // Görsel yükleme için yeni state
-  const [selectedImage, setSelectedImage] = useState(null);
-
-  const [nearbyVenues, setNearbyVenues] = useState([]);
-  const [loadingLocation, setLoadingLocation] = useState(false);
-
+  const [profileUserId, setProfileUserId] = useState(null);
   // --- Favori Mekanlar ---
   const [favoriteVenues, setFavoriteVenues] = useState([]);
   const [loadingFavorites, setLoadingFavorites] = useState(true);
@@ -44,14 +34,10 @@ const [loadingCollectionVenues, setLoadingCollectionVenues] = useState(false);
 const [editingCollectionId, setEditingCollectionId] = useState(null);
 const [editingCollectionName, setEditingCollectionName] = useState('');
 
-  const [posts, setPosts] = useState([
-    { id: '1', text: 'Bugün harika bir kahve mekanı keşfettim! ☕✨', location: 'Kadıköy Kahvecisi', time: '2 saat önce', image: null },
-    { id: '2', text: 'Venue uygulamasının arayüzü çok tatlı oldu, burası tam benlik.', location: '', time: 'Dün', image: null }
-  ]);
-
   useEffect(() => {
   supabase.auth.getUser().then(({ data }) => {
     if (data?.user) {
+      setProfileUserId(data.user.id);
       const currentUsername =
         data.user.user_metadata?.username ||
         data.user.email.split('@')[0];
@@ -317,88 +303,6 @@ const handleCreateCollection = async () => {
   }
 };
 
-  // EKLENDİ: Galeriden fotoğraf seçme fonksiyonu
-  const pickImage = async () => {
-    // Önce galeri erişim izni isteyelim
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      alert('Fotoğraf ekleyebilmek için galeri izni vermelisiniz.');
-      return;
-    }
-
-    // Galeriyi aç
-    let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true, // Kullanıcı kırpabilsin
-      aspect: [4, 3],
-      quality: 0.7, // Performans için kaliteyi biraz düşürelim
-    });
-
-    if (!result.canceled) {
-      setSelectedImage(result.assets[0].uri); // Seçilen görselin yerel yolunu kaydet
-    }
-  };
-
-  const fetchNearbyVenues = async () => {
-    try {
-      setLoadingLocation(true);
-      setIsLocationFocused(true);
-
-      let { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        alert('Yakındaki mekanları görebilmek için konum izni vermelisiniz.');
-        setLoadingLocation(false);
-        return;
-      }
-
-      let location = await Location.getCurrentPositionAsync({});
-      const userLat = location.coords.latitude;
-      const userLng = location.coords.longitude;
-
-      const { data: venuesData, error } = await supabase.from('venues').select('*');
-      if (error) throw error;
-
-      if (venuesData) {
-        const validVenues = venuesData.filter(v => v.latitude !== null && v.longitude !== null);
-        const sortedVenues = validVenues.map(venue => {
-          const distance = Math.sqrt(
-            Math.pow(venue.latitude - userLat, 2) + Math.pow(venue.longitude - userLng, 2)
-          );
-          return { ...venue, distance };
-        })
-        .sort((a, b) => a.distance - b.distance) 
-        .slice(0, 5); 
-
-        setNearbyVenues(sortedVenues);
-      }
-    } catch (err) {
-      console.log("Konum veya mekan çekme hatası:", err.message);
-    } finally {
-      setLoadingLocation(false);
-    }
-  };
-
-  const handleSharePost = () => {
-    if (!postText.trim() && !selectedImage) {
-      alert("Paylaşmak için bir metin yazın veya fotoğraf ekleyin!");
-      return;
-    }
-
-    const newPost = {
-      id: Date.now().toString(),
-      text: postText.trim(),
-      location: locationText.trim(), 
-      image: selectedImage, // EKLENDİ: Seçilen görseli gönderiye ekliyoruz
-      time: 'Şimdi'
-    };
-
-    setPosts([newPost, ...posts]);
-    setPostText('');
-    setLocationText('');
-    setSelectedImage(null); // Paylaştıktan sonra fotoğrafı temizle
-    setIsLocationFocused(false);
-  };
-
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     // ProfileScreen artık ProfileStack (Profil sekmesinin kendi iç
@@ -412,6 +316,7 @@ const handleCreateCollection = async () => {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
       style={styles.container}
     >
+      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 30 }}>
       {/* Üst Kısım: Profil Kartı */}
       <View style={styles.headerContainer}>
         <View style={styles.avatarCircle}>
@@ -794,108 +699,13 @@ const handleCreateCollection = async () => {
 
 </View>
 
-      {/* Orta Kısım: Gelişmiş Paylaşım Kutusu */}
-      <View style={styles.shareContainer}>
-        <TextInput
-          style={styles.shareInput}
-          placeholder="Neler düşünüyorsun? Yaz..."
-          placeholderTextColor="#aaa"
-          multiline
-          value={postText}
-          onChangeText={setPostText}
-        />
-        
-        <TextInput
-          style={styles.locationInput}
-          placeholder="📍 Mekan ara veya direkt kendin yaz..."
-          placeholderTextColor="#bbb"
-          value={locationText}
-          onChangeText={(text) => setLocationText(text)}
-          onFocus={fetchNearbyVenues} 
-        />
+      {/* Mekânda paylaşılan fotoğraflar kalıcı olarak profilde de görünür. */}
+      {profileUserId ? <View>
+        <Text style={{ marginHorizontal: 16, color: '#777', marginTop: 16 }}>Yeni fotoğraf paylaşmak için bulunduğun mekânın sayfasını aç.</Text>
+        <MomentFeed userId={profileUserId} navigation={navigation} />
+      </View> : null}
 
-        {/* Dinamik Öneri Alanı */}
-        {isLocationFocused && (
-          <View style={styles.suggestionsContainer}>
-            <Text style={styles.suggestionsTitle}>Yakınındaki Mekanlar:</Text>
-            {loadingLocation ? (
-              <ActivityIndicator size="small" color="#FF69B4" style={{ alignSelf: 'flex-start', marginLeft: 10 }} />
-            ) : (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                {nearbyVenues.length > 0 ? (
-                  nearbyVenues.map((venue) => (
-                    <TouchableOpacity 
-                      key={venue.id} 
-                      style={styles.suggestionBadge}
-                      onPress={() => {
-                        setLocationText(venue.name); 
-                        setIsLocationFocused(false);
-                      }}
-                    >
-                      <Text style={styles.suggestionText}>☕ {venue.name}</Text>
-                    </TouchableOpacity>
-                  ))
-                ) : (
-                  <Text style={{ fontSize: 12, color: '#aaa', paddingLeft: 5 }}>
-                    Mekan bulunamadı, direkt yazabilirsiniz.
-                  </Text>
-                )}
-              </ScrollView>
-            )}
-          </View>
-        )}
-
-        {/* EKLENDİ: Seçilen fotoğrafın küçük önizlemesi ve iptal butonu */}
-        {selectedImage && (
-          <View style={styles.previewImageContainer}>
-            <Image source={{ uri: selectedImage }} style={styles.previewImage} />
-            <TouchableOpacity style={styles.removeImageButton} onPress={() => setSelectedImage(null)}>
-              <Text style={styles.removeImageText}>✕</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        <View style={styles.shareActionRow}>
-          {/* EKLENDİ: Fotoğraf Ekleme İkonlu Buton */}
-          <TouchableOpacity style={styles.photoButton} onPress={pickImage}>
-            <Text style={styles.photoButtonText}>🖼️ Fotoğraf Ekle</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.shareButton} onPress={handleSharePost}>
-            <Text style={styles.shareButtonText}>Paylaş</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      <Text style={styles.sectionTitle}>Paylaşımlarım</Text>
-
-      {/* Alt Kısım: Akış Gönderileri */}
-      <FlatList
-        data={posts}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <View style={styles.postCard}>
-            <View style={styles.postHeader}>
-              <Text style={styles.postUser}>@{username}</Text>
-              <Text style={styles.postTime}>{item.time || 'Şimdi'}</Text>
-            </View>
-            <Text style={styles.postText}>{item.text}</Text>
-            
-            {/* EKLENDİ: Eğer gönderide fotoğraf varsa listelemede göster */}
-            {item.image && (
-              <Image source={{ uri: item.image }} style={styles.postImage} />
-            )}
-
-            {item.location ? (
-              <View style={styles.locationBadge}>
-                <Text style={styles.locationText}>📍 {item.location}</Text>
-              </View>
-            ) : null}
-          </View>
-        )}
-        contentContainerStyle={styles.feedList}
-        showsVerticalScrollIndicator={false}
-      />
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }

@@ -4,6 +4,8 @@ import { createStackNavigator } from '@react-navigation/stack';
 import HomeScreen from './HomeScreen';
 import DetailsScreen from './DetailsScreen';
 import VenueChatScreen from './VenueChatScreen';
+import PublicProfileScreen from './PublicProfileScreen';
+import MomentPhotoScreen from './MomentPhotoScreen';
 
 const Stack = createStackNavigator();
 
@@ -20,6 +22,8 @@ export default function HomeStack() {
       }}
     >
       <Stack.Screen name="HomeMain" component={HomeScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="PublicProfile" component={PublicProfileScreen} options={{ title: 'Profil' }} />
+      <Stack.Screen name="MomentPhoto" component={MomentPhotoScreen} options={{ title: 'Fotoğraf' }} />
       <Stack.Screen name="Details" component={DetailsScreen} options={{ headerShown: false }} />
       <Stack.Screen name="VenueChat" component={VenueChatScreen} options={{ headerShown: true, title: 'Sohbet' }} />
     </Stack.Navigator>
