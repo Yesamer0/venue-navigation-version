@@ -424,3 +424,7 @@ entrypoint = "./functions/notify-venue-message/index.ts"
 # Specifies static files to be bundled with the function. Supports glob patterns.
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/notify-venue-message/*.html" ]
+
+[functions.cleanup-visitor-photos]
+# Authenticated with PHOTO_CLEANUP_TOKEN inside the function.
+verify_jwt = false

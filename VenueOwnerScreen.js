@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useCallback, useState } from 'react';
 import { 
   View, 
   Text, 
@@ -12,6 +12,7 @@ import {
   Platform
 } from 'react-native';
 import { supabase } from './supabase';
+import { useFocusEffect } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 
 export default function VenueOwnerScreen({ navigation }) {
@@ -28,7 +29,7 @@ export default function VenueOwnerScreen({ navigation }) {
     { id: '2', text: 'Hafta içine özel: Alacağınız ikinci kahvede %30 indirim fırsatı! ☕✨', time: 'Dün' }
   ]);
 
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     supabase.auth.getUser().then(({ data }) => {
       if (data?.user) {
         const currentUsername = data.user.user_metadata?.username || data.user.email.split('@')[0];
@@ -36,7 +37,7 @@ export default function VenueOwnerScreen({ navigation }) {
         fetchMyVenues(data.user.id);
       }
     }).catch(err => console.log(err));
-  }, []);
+  }, []));
 
   const fetchMyVenues = async (ownerId) => {
     setLoadingVenues(true);
@@ -47,7 +48,7 @@ export default function VenueOwnerScreen({ navigation }) {
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.log('Mekanlarım çekme hatası:', error);
+      console.log('Mekan çekme hatası:', error);
     } else {
       setMyVenues(data || []);
     }
@@ -267,6 +268,7 @@ const addGalleryPhoto = async (venue) => {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
       style={styles.container}
     >
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 32 }} keyboardShouldPersistTaps="handled">
       {/* Üst Kısım: Mekan Yönetim Başlığı */}
       <View style={styles.headerContainer}>
         <View style={styles.storeIconBox}>
@@ -283,13 +285,13 @@ const addGalleryPhoto = async (venue) => {
 
       {/* Mekanlarım Bölümü: Geçiş Noktası */}
       <View style={styles.venuesSectionHeader}>
-        <Text style={styles.boxTitle}>Mekanlarım 🏢</Text>
-        <TouchableOpacity 
+        <Text style={styles.boxTitle}>Mekan 🏢</Text>
+        {!loadingVenues && myVenues.length === 0 && <TouchableOpacity
           style={styles.addVenueButton}
           onPress={() => navigation.navigate('AddVenue')}
         >
-          <Text style={styles.addVenueButtonText}>+ Yeni Mekan Ekle</Text>
-        </TouchableOpacity>
+          <Text style={styles.addVenueButtonText}>+ Mekan Ekle</Text>
+        </TouchableOpacity>}
       </View>
 
       {loadingVenues ? (
@@ -297,11 +299,11 @@ const addGalleryPhoto = async (venue) => {
       ) : myVenues.length === 0 ? (
         <View style={styles.emptyVenueBox}>
           <Text style={styles.emptyVenueText}>
-            Henüz bir mekanın yok. "+ Yeni Mekan Ekle" ile ilk mekanını oluştur, ardından menü ve fotoğraflarını ekleyebilirsin.
+            Henüz mekanını eklemedin. "Mekan Ekle" ile herkese açık mekan profilini oluşturabilirsin.
           </Text>
         </View>
       ) : (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.venuesScroll}>
+        <View style={styles.venuesScroll}>
           {myVenues.map((venue) => (
             <View key={venue.id} style={styles.venueCard}>
               <Text style={styles.venueCardName} numberOfLines={1}>{venue.name}</Text>
@@ -324,10 +326,10 @@ const addGalleryPhoto = async (venue) => {
 
   <TouchableOpacity
     style={[styles.manageButton, { flex: 1 }]}
-    onPress={() => addGalleryPhoto(venue)}
+    onPress={() => navigation.navigate('Details', { item: venue, initialTab: 'accountphotos' })}
   >
     <Text style={styles.manageButtonText}>
-      🖼️ Galeri
+      🖼️ Fotoğrafları Yönet
     </Text>
   </TouchableOpacity>
 </View>
@@ -339,12 +341,12 @@ const addGalleryPhoto = async (venue) => {
   }
 >
   <Text style={styles.manageButtonText}>
-    ⚙️ Mekanı Yönet
+    Mekanın Herkese Açık Sayfası
   </Text>
 </TouchableOpacity>
             </View>
           ))}
-        </ScrollView>
+        </View>
       )}
 
       {/* Orta Kısım: Kampanya / Duyuru Geçme Kutusu */}
@@ -370,11 +372,9 @@ const addGalleryPhoto = async (venue) => {
       <Text style={styles.sectionTitle}>Aktif Duyurularımız & Kampanyalar</Text>
 
       {/* Alt Kısım: Mekanın Kendi Duyuru Akışı */}
-      <FlatList
-        data={announcements}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <View style={styles.postCard}>
+      <View style={styles.feedList}>
+        {announcements.map(item => (
+          <View key={item.id} style={styles.postCard}>
             <View style={styles.postHeader}>
               <Text style={styles.postUser}>📢 {username}</Text>
               <Text style={styles.postTime}>{item.time}</Text>
@@ -384,10 +384,9 @@ const addGalleryPhoto = async (venue) => {
               <Text style={styles.activeBadgeText}>● Yayında</Text>
             </View>
           </View>
-        )}
-        contentContainerStyle={styles.feedList}
-        showsVerticalScrollIndicator={false}
-      />
+        ))}
+      </View>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }
@@ -588,8 +587,8 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 14,
     paddingBottom: 25,
-    marginRight: 12,
-    width: 180,
+    marginBottom: 12,
+    width: '100%',
     borderWidth: 1,
     borderColor: '#E0E0E0',
   },

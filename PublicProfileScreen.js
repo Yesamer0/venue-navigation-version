@@ -11,14 +11,23 @@ export default function PublicProfileScreen({ route, navigation }) {
   useEffect(() => {
     let active = true;
     setProfile(null); setError('');
-    supabase.rpc('get_venue_moment_profile', { p_user_id: userId }).then(({ data, error: e }) => {
+    const load = async () => {
+      const { data: venue, error: venueError } = await supabase.from('venues').select('*').eq('owner_id', userId).order('created_at', { ascending: false }).limit(1).maybeSingle();
+      if (!active) return;
+      if (venueError) throw venueError;
+      if (venue) {
+        navigation.replace('Details', { item: venue });
+        return;
+      }
+      const { data, error: e } = await supabase.rpc('get_venue_moment_profile', { p_user_id: userId });
       if (!active) return;
       if (e) setError(friendlyError(e));
       else if (!data?.length) setError('Profil bulunamadı.');
       else setProfile(data[0]);
-    }).catch((e) => { if (active) setError(friendlyError(e)); });
+    };
+    load().catch((e) => { if (active) setError(friendlyError(e)); });
     return () => { active = false; };
-  }, [userId]);
+  }, [userId, navigation]);
   return <ScrollView style={{ flex: 1, backgroundColor: '#FFF9FC' }}>
     <View style={{ padding: 24, alignItems: 'center' }}>
       {error ? <Text style={{ color: '#B42318' }}>{error}</Text> : profile ? <>

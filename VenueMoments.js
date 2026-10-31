@@ -5,7 +5,7 @@ import { supabase } from './supabase';
 import MomentFeed from './MomentFeed';
 import { decodePhoto, friendlyError, PHOTO_BUCKET, verifyVenueLocation } from './momentApi';
 
-export default function VenueMoments({ venue, isCheckedIn, navigation, showFeed, onShowPhotos }) {
+export default function VenueMoments({ venue, isCheckedIn, navigation, showFeed, onShowPhotos, canPublish = true }) {
   const [selected, setSelected] = useState(null);
   const [caption, setCaption] = useState('');
   const [busy, setBusy] = useState(false);
@@ -14,7 +14,7 @@ export default function VenueMoments({ venue, isCheckedIn, navigation, showFeed,
   const lock = useRef(false);
 
   const pick = async (camera = false) => {
-    if (lock.current) return;
+    if (lock.current || !canPublish) return;
     if (selected?.uploadPath) {
       Alert.alert('Bekleyen paylaşım', 'Önce bekleyen fotoğrafı paylaş veya Vazgeç ile kapat.');
       return;
@@ -97,6 +97,7 @@ export default function VenueMoments({ venue, isCheckedIn, navigation, showFeed,
 
   return <View style={{ backgroundColor: '#FFF9FC', marginTop: 12 }}>
     <View style={{ padding: 16 }}>
+      {!canPublish ? <Text style={{ color: '#777', paddingVertical: 12 }}>Mekan hesapları fotoğraflarını Fotoğraflar bölümünden paylaşır.</Text> : !venue.photo_closing_time ? <Text style={{ color: '#777', paddingVertical: 12 }}>Ziyaretçi paylaşımı için mekan sahibi kapanış saatini ayarlamalı.</Text> : <>
       <Text style={{ fontSize: 19, fontWeight: '700', color: '#9B1B4D' }}>Buradan bir kare paylaş</Text>
       {isCheckedIn ? <>
         <Text style={{ color: '#777', marginVertical: 10 }}>Fotoğraf eklerken ve paylaşırken mekânda olduğun konumla kontrol edilir.</Text>
@@ -112,6 +113,8 @@ export default function VenueMoments({ venue, isCheckedIn, navigation, showFeed,
         <TouchableOpacity disabled={busy} onPress={publish} style={{ backgroundColor: '#C2185B', borderRadius: 12, padding: 14, alignItems: 'center', opacity: busy ? 0.6 : 1 }}><Text style={{ color: '#fff', fontWeight: '700' }}>Fotoğrafı paylaş</Text></TouchableOpacity>
         <TouchableOpacity disabled={busy} onPress={cancel}><Text style={{ color: '#777', paddingVertical: 12 }}>Vazgeç</Text></TouchableOpacity>
       </View> : null}
+      <Text style={{ color: '#777', marginTop: 10 }}>Ziyaretçi fotoğrafları mekanın kapanış saatinde kaldırılır.</Text>
+      </>}
       {busy ? <ActivityIndicator color="#C2185B" style={{ marginTop: 12 }} /> : null}
     </View>
     {showFeed ? <MomentFeed venueId={venue.id} navigation={navigation} refreshKey={refreshKey} /> : null}
