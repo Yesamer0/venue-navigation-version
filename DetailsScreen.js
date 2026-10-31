@@ -10,29 +10,19 @@ import {
   ActivityIndicator, 
   Dimensions,
   AppState,
+  useWindowDimensions,
 } from 'react-native';
 import * as Location from 'expo-location';
 import { supabase } from './supabase'; 
 import { styles } from './styles';
 import { useFocusEffect } from '@react-navigation/native';
 import VenueMoments from './VenueMoments';
+import MenuPhotoImport from './MenuPhotoImport';
+import VenueAccountPhotos from './VenueAccountPhotos';
+import { getMenuGroup } from './menuGrouping';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
-
-// Menü kategorilerini Yiyecek / İçecek / Diğer olarak gruplamak için eşleme.
-const FOOD_CATEGORIES = ['Kruvasanlar (Tuzlu)', 'Kruvasanlar (Tatlı)', 'Tatlılar'];
-const DRINK_CATEGORIES = [
-  'İçecekler', 'Sıcak İçecekler', 'Soğuk İçecekler', 'Sıcak Kahveler', 'Soğuk Kahveler',
-  '3. Nesil Kahveler', 'Espressolar', 'Türk Kahveleri', 'Ice Bar Specialleri',
-  'Bitki Çayları', 'Soğuk Çaylar', 'Milkshakeler', 'Frozenler', 'Limonatalar',
-  'Frappeler', 'Paket Kahveler',
-];
-
-function getMenuGroup(category) {
-  if (FOOD_CATEGORIES.includes(category)) return 'yiyecek';
-  if (DRINK_CATEGORIES.includes(category)) return 'icecek';
-  return 'diger';
-}
+let presenceSubscriptionSequence = 0;
 
 // Canlı durum için: bu süre içinde tazelenmemiş bir "buradayım" kaydı artık sayılmaz
 const PRESENCE_WINDOW_MINUTES = 30;
@@ -60,16 +50,26 @@ const calculateDistance = (lat1, lon1, lat2, lon2) => {
 
 export default function DetailsScreen({ route, navigation }) {
   const { item } = route.params;
+  const { width: pageWidth } = useWindowDimensions();
+  const accountPager = useRef(null);
+
 
   const [currentUser, setCurrentUser] = useState(null);
   const [isOwner, setIsOwner] = useState(false);
+  const [isVenueAccount, setIsVenueAccount] = useState(false);
+  const [photoClosingTime, setPhotoClosingTime] = useState(item.photo_closing_time || null);
 
   // --- Favoriler ---
   const [isFavorite, setIsFavorite] = useState(false);
   const [favoriteId, setFavoriteId] = useState(null);
   const [loadingFavorite, setLoadingFavorite] = useState(false);
 
-  const [activeMainTab, setActiveMainTab] = useState('menu');
+  const [activeMainTab, setActiveMainTab] = useState(route.params.initialTab || 'menu');
+  useEffect(() => {
+    if (activeMainTab === 'menu' || activeMainTab === 'accountphotos') {
+      accountPager.current?.scrollTo({ x: activeMainTab === 'menu' ? 0 : pageWidth, animated: true });
+    }
+  }, [activeMainTab, pageWidth]);
   const [activeMenuGroup, setActiveMenuGroup] = useState('yiyecek');
 
   // --- Koleksiyonlar ---
@@ -143,19 +143,22 @@ export default function DetailsScreen({ route, navigation }) {
     fetchLiveCount();
 
     // Canlı durum tablosunu gerçek zamanlı dinle (biri check-in olunca sayı anlık güncellensin)
+    let active = true;
+    const subscriptionId = `${Date.now()}-${++presenceSubscriptionSequence}`;
     const channel = supabase
-      .channel(`venue-presence-${item.id}`)
+      .channel(`venue-presence-${item.id}-${subscriptionId}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'venue_presence', filter: `venue_id=eq.${item.id}` },
-        () => fetchLiveCount()
+        () => { if (active) fetchLiveCount(); }
       )
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      active = false;
+      void supabase.removeChannel(channel).catch(error => console.log('Canlı durum aboneliği kapatılamadı:', error));
     };
-  }, []);
+  }, [item.id]);
 
   const loadCurrentUser = async () => {
     try {
@@ -165,12 +168,13 @@ export default function DetailsScreen({ route, navigation }) {
 
       const { data: profile } = await supabase
         .from('users')
-        .select('username')
+        .select('username,is_venue')
         .eq('id', authUser.id)
         .maybeSingle();
 
       setCurrentUser({ id: authUser.id, username: profile?.username || 'Gezgin' });
       setIsOwner(item.owner_id === authUser.id);
+      setIsVenueAccount(profile?.is_venue === true || item.owner_id === authUser.id);
 
       // Kullanıcının bu mekanı daha önce favorileyip favorilemediğini kontrol et
       // Kullanıcının bu mekanı daha önce favorileyip favorilemediğini kontrol et
@@ -677,6 +681,7 @@ await fetchCheckInStatus(authUser.id);
       console.log('Menü çekme hatası:', error);
     } else {
       setMenuItems(data || []);
+      if (data?.length) setActiveMenuGroup(current => data.some(m => getMenuGroup(m.category, m.name, m.menu_group) === current) ? current : getMenuGroup(data[0].category, data[0].name, data[0].menu_group));
     }
     setLoadingMenu(false);
   };
@@ -722,7 +727,7 @@ const taggedPhotos = venuePhotos.filter(
 );
 
   const itemsInActiveGroup = menuItems.filter(
-    (m) => getMenuGroup(m.category) === activeMenuGroup
+    (m) => getMenuGroup(m.category, m.name, m.menu_group) === activeMenuGroup
   );
   const groupedByCategory = {};
   itemsInActiveGroup.forEach((m) => {
@@ -829,6 +834,7 @@ const taggedPhotos = venuePhotos.filter(
           name: editMenuName.trim(),
           price: editMenuPrice ? parseFloat(editMenuPrice.replace(',', '.')) : null,
           category: editMenuCategory.trim() || null,
+          menu_group: null,
         })
         .eq('id', editingMenuId);
 
@@ -1317,48 +1323,22 @@ const taggedPhotos = venuePhotos.filter(
         </View>
       </View>
 
-      {/* Ana Sekmeler: Menü & Galeri / Yorumlar & Etiketler / Sohbet */}
-      <View style={{ flexDirection: 'row', paddingHorizontal: 20, gap: 10, marginBottom: 15 }}>
-        <TouchableOpacity
-          style={{ flex: 1, paddingVertical: 10, borderRadius: 12, alignItems: 'center', backgroundColor: activeMainTab === 'photos' ? '#FF69B4' : '#F3F3F3' }}
-          onPress={() => setActiveMainTab('photos')}
-        >
-          <Text style={{ color: activeMainTab === 'photos' ? '#fff' : '#666', fontWeight: 'bold' }}>Fotoğraflar</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={{
-            flex: 1, paddingVertical: 10, borderRadius: 12, alignItems: 'center',
-            backgroundColor: activeMainTab === 'menu' ? '#FF69B4' : '#F3F3F3',
-          }}
-          onPress={() => setActiveMainTab('menu')}
-        >
-          <Text style={{ color: activeMainTab === 'menu' ? '#fff' : '#666', fontWeight: 'bold' }}>Menü & Galeri</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={{
-            flex: 1, paddingVertical: 10, borderRadius: 12, alignItems: 'center',
-            backgroundColor: activeMainTab === 'reviews' ? '#FF69B4' : '#F3F3F3',
-          }}
-          onPress={() => setActiveMainTab('reviews')}
-        >
-          <Text style={{ color: activeMainTab === 'reviews' ? '#fff' : '#666', fontWeight: 'bold' }}>Yorumlar & Etiketler</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={{
-            flex: 1, paddingVertical: 10, borderRadius: 12, alignItems: 'center',
-            backgroundColor: '#4B5563',
-          }}
-          onPress={() => navigation.navigate('VenueChat', { item })}
-        >
-          <Text style={{ color: '#fff', fontWeight: 'bold' }}>Sohbet 💬</Text>
-        </TouchableOpacity>
-      </View>
+      <Text style={{ paddingHorizontal: 20, marginBottom: 10, color: '#888' }}>Mekan hesabı · Menüyü ve fotoğrafları yana kaydır</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20, gap: 10, paddingBottom: 15 }}>
+        {[['menu', 'Menü'], ['accountphotos', 'Fotoğraflar'], ['photos', 'Ziyaretçiler'], ['reviews', 'Yorumlar']].map(([key, label]) => (
+          <TouchableOpacity key={key} accessibilityRole="tab" accessibilityState={{ selected: activeMainTab === key }} onPress={() => setActiveMainTab(key)} style={{ padding: 12, borderRadius: 12, backgroundColor: activeMainTab === key ? '#FF69B4' : '#F3F3F3' }}>
+            <Text style={{ fontWeight: '700', color: activeMainTab === key ? '#fff' : '#666' }}>{label}</Text>
+          </TouchableOpacity>
+        ))}
+        <TouchableOpacity onPress={() => navigation.navigate('VenueChat', { item })} style={{ padding: 12 }}><Text>Sohbet 💬</Text></TouchableOpacity>
+      </ScrollView>
 
       {/* ===== İÇERİK ===== */}
-      <VenueMoments venue={item} isCheckedIn={isCheckedIn} navigation={navigation}
-        showFeed={activeMainTab === 'photos'} onShowPhotos={() => setActiveMainTab('photos')} />
-      {activeMainTab === 'photos' ? null : activeMainTab === 'menu' ? (
-        <View style={{ paddingHorizontal: 20 }}>
+      {activeMainTab === 'photos' && <VenueMoments canPublish={!isVenueAccount} venue={{ ...item, photo_closing_time: photoClosingTime }} isCheckedIn={isCheckedIn} navigation={navigation}
+        showFeed={activeMainTab === 'photos'} onShowPhotos={() => setActiveMainTab('photos')} />}
+      {activeMainTab === 'photos' ? null : (activeMainTab === 'menu' || activeMainTab === 'accountphotos') ? (
+        <ScrollView ref={accountPager} horizontal pagingEnabled directionalLockEnabled showsHorizontalScrollIndicator={false} contentOffset={{ x: activeMainTab === 'accountphotos' ? pageWidth : 0, y: 0 }} onMomentumScrollEnd={event => setActiveMainTab(Math.round(event.nativeEvent.contentOffset.x / pageWidth) === 0 ? 'menu' : 'accountphotos')}>
+        <View style={{ width: pageWidth, paddingHorizontal: 20 }}>
 
           <View style={{ flexDirection: 'row', gap: 10, marginBottom: 15 }}>
             {item.has_wifi && (
@@ -1373,6 +1353,7 @@ const taggedPhotos = venuePhotos.filter(
             )}
           </View>
 
+          {isOwner && <MenuPhotoImport venueId={item.id} onImported={fetchMenuItems} />}
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
             <Text style={{ fontSize: 19, fontWeight: 'bold', color: '#333' }}>Menü 🍽️</Text>
             {isOwner && (
@@ -1457,97 +1438,9 @@ const taggedPhotos = venuePhotos.filter(
             </View>
           )}
 
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-            <Text style={{ fontSize: 19, fontWeight: 'bold', color: '#333' }}>Mekandan Kareler 📸</Text>
-            {isOwner && (
-              <TouchableOpacity onPress={() => setShowAddVenuePhotoForm(!showAddVenuePhotoForm)}>
-                <Text style={{ color: '#FF69B4', fontWeight: 'bold' }}>
-                  {showAddVenuePhotoForm ? 'İptal' : '+ Fotoğraf Ekle'}
-                </Text>
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {isOwner && showAddVenuePhotoForm && (
-            <View style={{ backgroundColor: '#FFF5F7', borderRadius: 16, padding: 15, marginBottom: 15, borderWidth: 1, borderColor: '#FCE7F3' }}>
-              <TextInput
-                style={{ backgroundColor: '#fff', borderRadius: 10, padding: 10, marginBottom: 10, borderWidth: 1, borderColor: '#F9A8D4' }}
-                placeholder="Fotoğraf linki (URL)"
-                autoCapitalize="none"
-                value={newVenuePhotoUrl}
-                onChangeText={setNewVenuePhotoUrl}
-              />
-              <TextInput
-                style={{ backgroundColor: '#fff', borderRadius: 10, padding: 10, marginBottom: 10, borderWidth: 1, borderColor: '#F9A8D4' }}
-                placeholder="Açıklama (opsiyonel)"
-                value={newVenuePhotoCaption}
-                onChangeText={setNewVenuePhotoCaption}
-              />
-              <TouchableOpacity
-                style={[styles.allButton, { opacity: isSubmittingVenuePhoto ? 0.6 : 1, alignItems: 'center' }]}
-                onPress={handleAddVenuePhoto}
-                disabled={isSubmittingVenuePhoto}
-              >
-                {isSubmittingVenuePhoto ? <ActivityIndicator color="#fff" /> : <Text style={styles.allButtonText}>Galeriye Ekle</Text>}
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {loadingPhotos ? (
-            <ActivityIndicator color="#FF69B4" style={{ marginVertical: 20 }} />
-          ) : officialPhotos.length === 0 ? (
-            <Text style={{ color: '#999', marginBottom: 20 }}>Henüz fotoğraf paylaşılmamış.</Text>
-          ) : (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 20 }}>
-              {officialPhotos.map((photo) => (
-  <View
-    key={photo.id}
-    style={{
-      width: 140,
-      height: 140,
-      marginRight: 12,
-    }}
-  >
-    <Image
-      source={{ uri: photo.image_url }}
-      style={{
-        width: '100%',
-        height: '100%',
-        borderRadius: 14,
-      }}
-    />
-
-    {isOwner && (
-      <TouchableOpacity
-        onPress={() => handleDeletePhoto(photo.id)}
-        style={{
-          position: 'absolute',
-          top: 6,
-          right: 6,
-          width: 26,
-          height: 26,
-          borderRadius: 13,
-          backgroundColor: 'rgba(0,0,0,0.65)',
-          justifyContent: 'center',
-          alignItems: 'center',
-        }}
-      >
-        <Text
-          style={{
-            color: '#fff',
-            fontSize: 13,
-            fontWeight: 'bold',
-          }}
-        >
-          ✕
-        </Text>
-      </TouchableOpacity>
-    )}
-  </View>
-))}
-            </ScrollView>
-          )}
         </View>
+        <View style={{ width: pageWidth }}><VenueAccountPhotos onClosingChange={setPhotoClosingTime} venue={item} isOwner={isOwner} active={activeMainTab === 'accountphotos'} legacyPhotos={officialPhotos} onDeleteLegacy={handleDeletePhoto} /></View>
+        </ScrollView>
       ) : (
         <View style={{ paddingHorizontal: 20 }}>
 

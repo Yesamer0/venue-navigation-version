@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,7 @@ import {
 import * as Location from 'expo-location';
 import MapView, { Marker } from 'react-native-maps';
 import { supabase } from './supabase';
+import { useFocusEffect } from '@react-navigation/native';
 import { styles } from './styles';
 
 const COLORS = {
@@ -75,10 +76,10 @@ export default function HomeScreen({ navigation }) {
 
   const mapRef = useRef(null);
 
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     fetchVenues();
     fetchRatings();
-  }, []);
+  }, []));
 
   const fetchVenues = async () => {
     try {
@@ -638,6 +639,8 @@ export default function HomeScreen({ navigation }) {
   return (
     <SafeAreaView style={localStyles.container}>
       <FlatList
+        refreshing={loading}
+        onRefresh={() => { fetchVenues(); fetchRatings(); }}
         data={filteredVenues}
         keyExtractor={(item) => item.id.toString()}
         renderItem={renderVenue}

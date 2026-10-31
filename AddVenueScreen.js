@@ -238,8 +238,8 @@ export default function AddVenueScreen({ navigation }) {
         }
       }
 
-      alert('Mekan başarıyla eklendi! 🎉');
-      navigation.goBack();
+      alert('Mekan hesabın oluşturuldu. Şimdi Menü bölümünden fotoğrafla menünü ekleyebilirsin.');
+      navigation.replace('Details', { item: venueData });
     } catch (err) {
       alert('Bir bağlantı sorunu oluştu: ' + err.message);
     } finally {
@@ -344,7 +344,8 @@ export default function AddVenueScreen({ navigation }) {
       )}
 
       {/* Menü Yapıştırma */}
-      <Text style={[styles.label, { marginTop: 25 }]}>Menü (Google'dan kopyala, buraya yapıştır)</Text>
+      <Text style={[styles.label, { marginTop: 25 }]}>Menü</Text>
+      <Text style={{ color: '#666', marginBottom: 12 }}>Mekanı kaydettikten sonra açılan hesabında menü fotoğrafını seçebilir veya çekebilirsin. Ürünler yapay zekâyla otomatik eklenir. İstersen aşağıya menü metni de yapıştırabilirsin.</Text>
       <TextInput
         style={[styles.input, { height: 120, textAlignVertical: 'top' }]}
         placeholder={'Örn:\nTürk Kahvesi 45 TL\nCappuccino 60\nLimonata - 55'}

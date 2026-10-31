@@ -35,10 +35,14 @@ export default function MomentFeed({ venueId = null, userId = null, navigation, 
     }
   }, [venueId, userId, posts.length]);
 
+  const loadRef = useRef(load);
+  loadRef.current = load;
+
   // Only filter/publication changes should reload; pagination must not reset the feed.
   useFocusEffect(useCallback(() => {
     load();
-    return () => { generation.current += 1; fetching.current = false; };
+    const timer = setInterval(() => loadRef.current(), 30000);
+    return () => { clearInterval(timer); generation.current += 1; fetching.current = false; };
   }, [venueId, userId, refreshKey]));
 
   const like = async (post) => {
@@ -58,6 +62,12 @@ export default function MomentFeed({ venueId = null, userId = null, navigation, 
     if (busy.current.has(post.id)) return;
     busy.current.add(post.id); setPending((p) => ({ ...p, [post.id]: true }));
     try {
+      if (userId) {
+        const { error: hideError } = await supabase.rpc('hide_photo_from_profile', { p_photo_id: post.id, p_kind: 'visitor' });
+        if (hideError) throw hideError;
+        setPosts(previous => previous.filter(p => p.id !== post.id));
+        return;
+      }
       const { data, error: deleteError } = await supabase.from('venue_moments').delete().eq('id', post.id).select('id');
       if (deleteError) throw deleteError;
       if (!data?.length) throw new Error('Paylaşım silinemedi. Yeniden dene.');
@@ -91,9 +101,9 @@ export default function MomentFeed({ venueId = null, userId = null, navigation, 
         <TouchableOpacity disabled={pending[post.id]} onPress={() => like(post)} accessibilityRole="button" accessibilityState={{ selected: post.liked_by_me, disabled: !!pending[post.id] }} accessibilityLabel={post.liked_by_me ? 'Beğeniyi kaldır' : 'Fotoğrafı beğen'}>
           <Text style={s.like}>{post.liked_by_me ? '♥' : '♡'} {post.like_count} beğeni</Text>
         </TouchableOpacity>
-        {post.is_mine ? <TouchableOpacity disabled={pending[post.id]} onPress={() => Alert.alert('Fotoğrafı sil', 'Bu paylaşım silinsin mi?', [
+        {post.is_mine ? <TouchableOpacity disabled={pending[post.id]} onPress={() => Alert.alert(userId ? 'Profilimden kaldır' : 'Fotoğrafı sil', userId ? 'Mekandaki paylaşım kapanış saatine kadar kalır.' : 'Bu paylaşım mekandan ve profilden silinsin mi?', [
           { text: 'Vazgeç', style: 'cancel' }, { text: 'Sil', style: 'destructive', onPress: () => remove(post) },
-        ])}><Text style={s.muted}>Sil</Text></TouchableOpacity> : null}
+        ])}><Text style={s.muted}>{userId ? 'Profilimden kaldır' : 'Sil'}</Text></TouchableOpacity> : null}
       </View>
     </View>)}
     {loading ? <ActivityIndicator color="#C2185B" style={{ margin: 16 }} /> : null}
