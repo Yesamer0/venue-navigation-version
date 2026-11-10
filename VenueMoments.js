@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { supabase } from './supabase';
 import MomentFeed from './MomentFeed';
 import { decodePhoto, friendlyError, PHOTO_BUCKET, verifyVenueLocation } from './momentApi';
@@ -26,11 +27,15 @@ export default function VenueMoments({ venue, isCheckedIn, navigation, showFeed,
         const permission = await ImagePicker.requestCameraPermissionsAsync();
         if (!permission.granted) throw new Error('Fotoğraf çekmek için kamera izni gerekiyor.');
       }
-      const options = { mediaTypes: ['images'], allowsEditing: true, quality: 0.7, base64: true, exif: false };
+      const options = { mediaTypes: ['images'], allowsEditing: false, quality: 1, exif: false };
       const result = camera ? await ImagePicker.launchCameraAsync(options) : await ImagePicker.launchImageLibraryAsync(options);
       if (!result.canceled && result.assets?.[0]) {
-        decodePhoto(result.assets[0].base64);
-        setSelected(result.assets[0]); setVerified(true);
+        const asset = result.assets[0];
+        const actions = Math.max(asset.width || 0, asset.height || 0) > 2400
+          ? [{ resize: asset.width >= asset.height ? { width: 2400 } : { height: 2400 } }] : [];
+        const prepared = await manipulateAsync(asset.uri, actions, { format: SaveFormat.JPEG, compress: 0.85, base64: true });
+        decodePhoto(prepared.base64);
+        setSelected(prepared); setVerified(true);
       }
     } catch (e) { setVerified(false); Alert.alert('Fotoğraf seçilemedi', friendlyError(e)); }
     finally { lock.current = false; setBusy(false); }
@@ -97,7 +102,7 @@ export default function VenueMoments({ venue, isCheckedIn, navigation, showFeed,
 
   return <View style={{ backgroundColor: '#FFF9FC', marginTop: 12 }}>
     <View style={{ padding: 16 }}>
-      {!canPublish ? <Text style={{ color: '#777', paddingVertical: 12 }}>Mekan hesapları fotoğraflarını Fotoğraflar bölümünden paylaşır.</Text> : !venue.photo_closing_time ? <Text style={{ color: '#777', paddingVertical: 12 }}>Ziyaretçi paylaşımı için mekan sahibi kapanış saatini ayarlamalı.</Text> : <>
+      {!canPublish ? <Text style={{ color: '#777', paddingVertical: 12 }}>Mekan hesapları fotoğraflarını Fotoğraflar bölümünden paylaşır.</Text> : <>
       <Text style={{ fontSize: 19, fontWeight: '700', color: '#9B1B4D' }}>Buradan bir kare paylaş</Text>
       {isCheckedIn ? <>
         <Text style={{ color: '#777', marginVertical: 10 }}>Fotoğraf eklerken ve paylaşırken mekânda olduğun konumla kontrol edilir.</Text>
@@ -113,7 +118,7 @@ export default function VenueMoments({ venue, isCheckedIn, navigation, showFeed,
         <TouchableOpacity disabled={busy} onPress={publish} style={{ backgroundColor: '#C2185B', borderRadius: 12, padding: 14, alignItems: 'center', opacity: busy ? 0.6 : 1 }}><Text style={{ color: '#fff', fontWeight: '700' }}>Fotoğrafı paylaş</Text></TouchableOpacity>
         <TouchableOpacity disabled={busy} onPress={cancel}><Text style={{ color: '#777', paddingVertical: 12 }}>Vazgeç</Text></TouchableOpacity>
       </View> : null}
-      <Text style={{ color: '#777', marginTop: 10 }}>Ziyaretçi fotoğrafları mekanın kapanış saatinde kaldırılır.</Text>
+      <Text style={{ color: '#777', marginTop: 10 }}>Fotoğrafın profilinde ve mekanın Fotoğraflar bölümünde kalır. Yalnızca sen sildiğinde iki yerden de kaldırılır.</Text>
       </>}
       {busy ? <ActivityIndicator color="#C2185B" style={{ marginTop: 12 }} /> : null}
     </View>

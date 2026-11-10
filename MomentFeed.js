@@ -2,6 +2,7 @@ import React, { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from './supabase';
+import MomentComments from './MomentComments';
 import { friendlyError, PAGE_SIZE, PHOTO_BUCKET, photoUrl } from './momentApi';
 
 export default function MomentFeed({ venueId = null, userId = null, navigation, refreshKey = 0 }) {
@@ -62,18 +63,11 @@ export default function MomentFeed({ venueId = null, userId = null, navigation, 
     if (busy.current.has(post.id)) return;
     busy.current.add(post.id); setPending((p) => ({ ...p, [post.id]: true }));
     try {
-      if (userId) {
-        const { error: hideError } = await supabase.rpc('hide_photo_from_profile', { p_photo_id: post.id, p_kind: 'visitor' });
-        if (hideError) throw hideError;
-        setPosts(previous => previous.filter(p => p.id !== post.id));
-        return;
-      }
-      const { data, error: deleteError } = await supabase.from('venue_moments').delete().eq('id', post.id).select('id');
+      const { error: deleteError } = await supabase.rpc('delete_venue_moment', { p_moment_id: post.id });
       if (deleteError) throw deleteError;
-      if (!data?.length) throw new Error('Paylaşım silinemedi. Yeniden dene.');
-      setPosts((previous) => previous.filter((p) => p.id !== post.id));
-      const { error: storageError } = await supabase.storage.from(PHOTO_BUCKET).remove([post.storage_path]);
-      if (storageError) console.log('Silinen paylaşımın dosyası temizlenemedi:', storageError.message);
+      setPosts(previous => previous.filter(p => p.id !== post.id));
+      // The server queue retries file cleanup if the device loses its connection.
+      try { await supabase.storage.from(PHOTO_BUCKET).remove([post.storage_path]); } catch (_) { /* queued on the server */ }
     } catch (e) { Alert.alert('Silinemedi', friendlyError(e)); }
     finally { busy.current.delete(post.id); setPending((p) => ({ ...p, [post.id]: false })); }
   };
@@ -101,10 +95,11 @@ export default function MomentFeed({ venueId = null, userId = null, navigation, 
         <TouchableOpacity disabled={pending[post.id]} onPress={() => like(post)} accessibilityRole="button" accessibilityState={{ selected: post.liked_by_me, disabled: !!pending[post.id] }} accessibilityLabel={post.liked_by_me ? 'Beğeniyi kaldır' : 'Fotoğrafı beğen'}>
           <Text style={s.like}>{post.liked_by_me ? '♥' : '♡'} {post.like_count} beğeni</Text>
         </TouchableOpacity>
-        {post.is_mine ? <TouchableOpacity disabled={pending[post.id]} onPress={() => Alert.alert(userId ? 'Profilimden kaldır' : 'Fotoğrafı sil', userId ? 'Mekandaki paylaşım kapanış saatine kadar kalır.' : 'Bu paylaşım mekandan ve profilden silinsin mi?', [
+        {post.is_mine ? <TouchableOpacity disabled={pending[post.id]} onPress={() => Alert.alert('Fotoğrafı sil', 'Bu fotoğraf profilinden ve mekanın fotoğraflarından, yorumları ve beğenileriyle birlikte silinsin mi?', [
           { text: 'Vazgeç', style: 'cancel' }, { text: 'Sil', style: 'destructive', onPress: () => remove(post) },
-        ])}><Text style={s.muted}>{userId ? 'Profilimden kaldır' : 'Sil'}</Text></TouchableOpacity> : null}
+        ])}><Text style={s.muted}>Fotoğrafımı sil</Text></TouchableOpacity> : null}
       </View>
+      <MomentComments momentId={post.id} />
     </View>)}
     {loading ? <ActivityIndicator color="#C2185B" style={{ margin: 16 }} /> : null}
     {more && !loading ? <TouchableOpacity style={s.more} onPress={() => load(true)}><Text style={s.link}>Daha fazla göster</Text></TouchableOpacity> : null}

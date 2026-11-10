@@ -1,51 +1,41 @@
-# Venue photo and menu work — 2026-10-31
+# Venue implementation notes — 2026-11-10
 
-## Implemented
+## Current product rules
 
-- Swipe between Menu and Photos on the public venue page; visitors remain separate.
-- Gemini-backed menu image import with structured product names, prices, categories and food/drink groups; same-image retries do not duplicate items.
-- Venue photo uploads with author usernames, at most three pinned photos and newest-first ordering for remaining photos.
-- Venue accounts cannot post as visitors. Per-venue closing time in Europe/Istanbul controls visitor-post expiry.
-- Authenticated scheduled cleanup removes expired visitor records and retries Storage file deletion every minute.
-- Venue management panel has no photo feed; it links to the public venue page. Home and owner venue lists reload on focus.
-- Fixed realtime channel reuse and a Storage RLS column-shadowing bug.
+- Travelers can read menus but cannot add, edit, delete or import products. All menu writes require both users.is_venue=true and ownership of that cafe; RLS and import RPCs enforce this.
+- Visitor photos are PERMANENT. A single venue_moments row appears on the author's profile, public profile and the cafe's Photos tab (also accessible from Visitors). Only the author can delete it, removing it from every view with its likes/comments. The venue owner cannot delete a visitor's post or someone else's comment. Closing times never expire visitor posts. There is no profile-only hide for visitor photos anymore; the old hide RPC now performs the same author-only deletion for compatibility.
+- Existing surviving photos are preserved. Previously profile-hidden visitor posts honor the author's removal by deleting from both views. Business accounts keep their separate official photo gallery; they cannot publish as visitors. Owners can pin up to three of their official photos.
+- Photo likes are one per signed-in user and idempotent. Visitor photo comments support 1–500 characters, pagination, retry-safe posting, and author-only deletion. The same photo ID means the same comments/likes in profile and cafe views.
+- Photo publication still requires check-in and a fresh accurate GPS position. Closing time is no longer a prerequisite. Gallery/camera images are normalized to JPEG up to 2400px before upload.
+- The demo button creates/reuses the business account's single deneme cafe at a fresh phone GPS fix. Travelers visit that shared cafe without being converted into owners. Normal distance checks apply to check-in.
 
-## Menu import status — 2026-11-10
+## Menu reconciliation
 
-Live three-product image test passed: Cay 40 TL, Latte 120 TL, Cheesecake 180 TL were read and persisted with correct food/drink groups in 4.3 seconds. Repeating the same image returned the existing import without duplicating products. A temporary traveler account was rejected before AI. Temporary accounts and the test cafe were removed. The user's own phone photo still needs verification in the updated UI; this fixture test is not a claim that every photo is readable.
+- Incoming photos insert new products and update readable prices on existing products; unreadable prices never erase a known price. Entire product families absent from a page remain.
+- Identity tolerates case, Turkish diacritics, punctuation, spaces and word order. Standard S/small, M/medium and L/large spellings match Küçük/Orta/Büyük. Known serving/descriptive differences such as Çay (demlik)/Demlik Çay and Limonata (ev yapımı)/Limonata share a family.
+- The user confirmed S/Y annotations are sizes/variants, and explicitly requested that a new single-option product replace older small/large options. For each family represented in a new photo, only that photo's variants remain. Multiple variants on the same new page remain distinct. Never apply this as a deletion of unrelated absent product families.
+- A unique expression index prevents duplicate product identities even through direct inserts. Legacy duplicates and superseded variants are stored in the private menu_merge_archive before removal; newest recorded batches are retained. menu_updated_at tracks future updates. Venue row locking serializes imports. Conflicting prices for the same identity on one page reject the page atomically.
+- Cached older photos cannot roll back later price updates. The UI previews the photo before Menüyü oku ve ekle, retains it on failure, and refreshes the menu on success.
+- On the live deneme menu, nine superseded rows were archived, leaving 18 products and zero duplicate identities. Small/large Cappuccino and Latte variants were superseded by the newer S variants at 155 TL.
 
-## Runtime configuration
+## Runtime and cleanup
 
-- `GEMINI_API_KEY`: Supabase Edge Function secret. Never commit its value.
-- `GEMINI_MENU_MODEL`: optional; default `gemini-flash-lite-latest` (alias, not a pinned model revision).
-- `PHOTO_CLEANUP_TOKEN`: shared random secret in Edge Function secrets and Supabase Vault (`venue_photo_cleanup_token`).
-- `cleanup-visitor-photos` uses its own token check; its gateway JWT verification is disabled in config.toml.
-- For a new environment, apply all checked-in migrations, provision the cleanup token, deploy the cleanup function and apply schedule_visitor_cleanup. The current linked project already has these applied.
-- The owner must configure the venue closing time before visitors can publish.
+- GEMINI_API_KEY stays in Supabase secrets, never in the app. Optional GEMINI_MENU_MODEL defaults to gemini-flash-lite-latest. At most two bounded generation attempts are made; transient failures can use an available stable Flash model from Google's catalog.
+- import-menu has gateway verify_jwt=false with explicit user authorization. Its handler still verifies auth.getUser and business role; owner-scoped SQL RPCs enforce authorization. Error messages distinguish provider quota, model availability, timeouts and saves.
+- PHOTO_CLEANUP_TOKEN stays in Edge secrets and Vault. The existing minute-based cleanup job now ONLY cleans files after author deletion. queue_expired_visitor_photos is intentionally a no-op; do not restore the old expiry behavior. An after-delete trigger queues files. The worker additionally protects any path with a surviving post, and retries failed deletions. File cleanup never drives post deletion.
+- All checked-in migrations, including 20261110130000 and 20261110131000, are applied and recorded on the linked project. Never reapply old standalone lifecycle SQL on top of these migrations.
+- Menus/official gallery/visitor photos are separate records. Menu photo import produces products and does not publish the source image as a social post.
 
-## Validation and limits
+## Validation
 
-PostgreSQL-engine tests covered ownership, idempotency, Storage RLS, maximum three pins, asymmetric profile hiding, timezone/midnight expiry and cleanup retry behavior. iOS Metro bundles were compiled and downloaded through the tunnel. The scheduled cleanup returned HTTP 200. These checks do not replace real-device camera testing.
+- node scripts/verify-menu-demo.cjs: gallery/camera preview, JPEG conversion, traveler hiding, shared demo routing, failure retry and refresh.
+- node scripts/verify-menu-edge.cjs: role gate, owner commit, provider fallback, timeout/quota/truncation and cached import.
+- node scripts/verify-menu-permissions.cjs: PostgreSQL role/RLS rules, identity normalization, legacy deduplication, variant replacement, current prices, null-price protection, archive, idempotency and ambiguity rollback.
+- node scripts/verify-photo-social.cjs: actual PostgreSQL publication without closing time, permanent profile/cafe visibility, owner deletion denial, comment/like idempotency and authorization, cascading author deletion and cleanup queue.
+- node scripts/verify-photo-ui.cjs: profile/cafe use the same deletion API and comment thread; foreign posts have no delete control.
+- node scripts/verify-photo-cleanup.cjs: token auth, live-file protection and retry on failed file removal.
+- Live two-photo AI validation passed (Cay 40→55, Latte 120→140, Espresso 90 inserted, absent Cheesecake 180 retained); test accounts/cafe removed.
+- Live Storage/JWT social validation passed: visitor publication with no closing time, same photo in cafe/profile, venue owner cannot delete photo/comment, likes and comments persist without retry duplicates, author deletion removes both views and cascades social records. Temporary test users/cafe/image were removed.
+- These automated/live API tests do not replace checking final layout and interactions on the user's physical phone. Remote push registration is skipped in Expo Go; app build/project configuration remains a separate release task.
 
-The latest UI decision removes the duplicate photo feed from personal/management screens; venue photos are displayed on the public venue page. The earlier profile-hidden database support remains but is not exposed through that removed feed.
-
-Legacy gallery entries are preserved. Pinning applies to the new venue-account photo records. Photo feeds currently load at most 300 venue photos. Public Storage image links remain readable until their files are removed.
-
-
-## Menu permissions and photo flow — 2026-11-10
-
-- Menu tools require BOTH `users.is_venue=true` and venue ownership. Travelers see menu/read-only sections and never see menu upload/add/edit/delete controls, even if an old test cafe has their owner_id. Direct writes and both import RPCs enforce the same rule. Read access to menus is preserved.
-- The demo button opens the business account's existing `deneme` cafe for travelers without creating a cafe or changing their role. A business account creates/reuses its own `deneme` cafe at a fresh, accurate phone GPS fix. Check-in still uses the normal distance rule. Other cafes are untouched.
-- Camera/gallery selection now prepares a JPEG (maximum 2400px edge), shows a preview, then requires `Menüyü oku ve ekle`. The image is converted into products; it is not a gallery photo upload. Failed imports retain the preview for retry; success reports the product count and refreshes the menu. A refresh failure is distinguished from a save failure.
-- Live logs identified 75-second AI timeouts and Google 503 capacity errors. The reader uses Flash Lite by default, with at most two bounded generation attempts and an available stable Flash model selected from Google's catalog on transient failure. Errors distinguish quota, unavailable model, timeout, and database save. Failed attempts release the in-progress cooldown; hourly and attempt caps remain.
-- The legacy gateway check is disabled with explicit user approval; handler JWT verification and server role/ownership authorization are enforced. Migration `20261110093000_menu_business_permissions.sql` is applied to the linked project and recorded in migration history.
-- Run `node scripts/verify-menu-demo.cjs`, `node scripts/verify-menu-edge.cjs`, and `node scripts/verify-menu-permissions.cjs` after `npm ci`. They test UI preview/retry and traveler hiding, server fallback/failure behavior, and actual PostgreSQL RLS/role/idempotency rules. Live fixture validation supplements these tests.
-
-Validation completed: iOS export passed (1256 modules); all three verification scripts passed. The earlier traveler-owned duplicate `deneme` cafe contained no menu, photos, reviews, favorites, messages, campaigns or collections. It was removed together with its temporary presence/failed imports under a transaction that aborts if real content exists. Exactly one `deneme` cafe remains, owned by the business account. No other cafes were changed.
-
-
-## Reconcile later menu photos — 2026-11-10
-
-New menu photos now update matching product prices and insert only unseen products. Matching uses the full product name normalized for Unicode, letter case, Turkish i variants and repeated spaces; sizes/variants remain distinct names. Category headings do not determine identity. Missing/unreadable prices never erase known prices. Products absent from a page remain. Repeated lines on one page collapse; conflicting prices for the same full name reject the entire page rather than guessing. Venue locking serializes separate pages. Replaying an already processed image returns its original result without rolling back newer prices. Role/owner requirements remain unchanged. Existing historical duplicates are not deleted.
-
-Live two-photo validation passed: the second page updated Cay 40→55 and Latte 120→140, inserted Espresso 90, preserved Cheesecake 180 absent from the page, and kept four total products. Replaying the first photo did not roll prices back. Temporary test accounts/cafe were cleaned. Migration 20261110110000 is recorded in the linked project.
+Final verification: all six local verification scripts and iOS export (1257 modules) passed. Live checks found zero temporary test users/cafes, one surviving original visitor photo, no expiring posts and zero duplicate menu identities. The Expo tunnel was restarted after a DNS failure.

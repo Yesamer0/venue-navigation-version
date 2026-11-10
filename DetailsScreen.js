@@ -58,7 +58,6 @@ export default function DetailsScreen({ route, navigation }) {
   const [currentUser, setCurrentUser] = useState(null);
   const [isOwner, setIsOwner] = useState(false);
   const [isVenueAccount, setIsVenueAccount] = useState(false);
-  const [photoClosingTime, setPhotoClosingTime] = useState(item.photo_closing_time || null);
 
   // --- Favoriler ---
   const [isFavorite, setIsFavorite] = useState(false);
@@ -793,7 +792,7 @@ const taggedPhotos = venuePhotos.filter(
         }]);
 
       if (error) {
-        alert("Menü Hatası: " + error.message);
+        alert(error.code === '23505' ? 'Bu ürün zaten menüde var. Mevcut ürünün fiyatını düzenleyebilirsin.' : 'Menü Hatası: ' + error.message);
       } else {
         setNewMenuName('');
         setNewMenuPrice('');
@@ -843,7 +842,7 @@ const taggedPhotos = venuePhotos.filter(
         .eq('id', editingMenuId);
 
       if (error) {
-        alert('Güncelleme Hatası: ' + error.message);
+        alert(error.code === '23505' ? 'Bu isim ve boyutta başka bir ürün zaten var.' : 'Güncelleme Hatası: ' + error.message);
       } else {
         cancelEditMenuItem();
         fetchMenuItems();
@@ -976,7 +975,7 @@ const taggedPhotos = venuePhotos.filter(
         .eq('id', editingPhotoId);
 
       if (error) {
-        alert('Güncelleme Hatası: ' + error.message);
+        alert(error.code === '23505' ? 'Bu isim ve boyutta başka bir ürün zaten var.' : 'Güncelleme Hatası: ' + error.message);
       } else {
         cancelEditPhoto();
         fetchVenuePhotos();
@@ -1138,7 +1137,7 @@ const taggedPhotos = venuePhotos.filter(
   };
 
   return (
-    <ScrollView style={{ height: SCREEN_HEIGHT, backgroundColor: '#fff' }} contentContainerStyle={{ paddingBottom: 40 }}>
+    <ScrollView keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets keyboardDismissMode="on-drag" style={{ height: SCREEN_HEIGHT, backgroundColor: '#fff' }} contentContainerStyle={{ paddingBottom: 40 }}>
       {/* ===== ÜST KISIM ===== */}
       <View>
         <Image source={{ uri: item.image_url }} style={{ width: '100%', height: 180 }} />
@@ -1339,10 +1338,10 @@ const taggedPhotos = venuePhotos.filter(
       </ScrollView>
 
       {/* ===== İÇERİK ===== */}
-      {activeMainTab === 'photos' && <VenueMoments canPublish={!isVenueAccount} venue={{ ...item, photo_closing_time: photoClosingTime }} isCheckedIn={isCheckedIn} navigation={navigation}
+      {activeMainTab === 'photos' && <VenueMoments canPublish={!isVenueAccount} venue={item} isCheckedIn={isCheckedIn} navigation={navigation}
         showFeed={activeMainTab === 'photos'} onShowPhotos={() => setActiveMainTab('photos')} />}
       {activeMainTab === 'photos' ? null : (activeMainTab === 'menu' || activeMainTab === 'accountphotos') ? (
-        <ScrollView ref={accountPager} horizontal pagingEnabled directionalLockEnabled showsHorizontalScrollIndicator={false} contentOffset={{ x: activeMainTab === 'accountphotos' ? pageWidth : 0, y: 0 }} onMomentumScrollEnd={event => setActiveMainTab(Math.round(event.nativeEvent.contentOffset.x / pageWidth) === 0 ? 'menu' : 'accountphotos')}>
+        <ScrollView ref={accountPager} keyboardShouldPersistTaps="handled" horizontal pagingEnabled directionalLockEnabled showsHorizontalScrollIndicator={false} contentOffset={{ x: activeMainTab === 'accountphotos' ? pageWidth : 0, y: 0 }} onMomentumScrollEnd={event => setActiveMainTab(Math.round(event.nativeEvent.contentOffset.x / pageWidth) === 0 ? 'menu' : 'accountphotos')}>
         <View style={{ width: pageWidth, paddingHorizontal: 20 }}>
 
           <View style={{ flexDirection: 'row', gap: 10, marginBottom: 15 }}>
@@ -1444,7 +1443,10 @@ const taggedPhotos = venuePhotos.filter(
           )}
 
         </View>
-        <View style={{ width: pageWidth }}><VenueAccountPhotos onClosingChange={setPhotoClosingTime} venue={item} isOwner={isOwner} active={activeMainTab === 'accountphotos'} legacyPhotos={officialPhotos} onDeleteLegacy={handleDeletePhoto} /></View>
+        <View style={{ width: pageWidth }}><VenueAccountPhotos venue={item} isOwner={isOwner} active={activeMainTab === 'accountphotos'} legacyPhotos={officialPhotos} onDeleteLegacy={handleDeletePhoto} />
+          {activeMainTab === 'accountphotos' && <VenueMoments venue={item} isCheckedIn={isCheckedIn} navigation={navigation}
+            canPublish={!isVenueAccount} showFeed onShowPhotos={() => setActiveMainTab('accountphotos')} />}
+        </View>
         </ScrollView>
       ) : (
         <View style={{ paddingHorizontal: 20 }}>

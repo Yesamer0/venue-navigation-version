@@ -5,9 +5,8 @@ import * as ImagePicker from 'expo-image-picker';
 import { supabase } from './supabase';
 import { decodePhoto } from './momentApi';
 
-export default function VenueAccountPhotos({ venue, isOwner, legacyPhotos = [], onDeleteLegacy, active = true, onClosingChange }) {
+export default function VenueAccountPhotos({ venue, isOwner, legacyPhotos = [], onDeleteLegacy, active = true }) {
   const [photos, setPhotos] = useState([]);
-  const [closing, setClosing] = useState((venue.photo_closing_time || '').slice(0, 5));
   const [selected, setSelected] = useState(null);
   const [caption, setCaption] = useState('');
   const [busy, setBusy] = useState(false);
@@ -18,8 +17,6 @@ export default function VenueAccountPhotos({ venue, isOwner, legacyPhotos = [], 
     const { data, error: e } = await supabase.from('venue_account_photos').select('*').eq('venue_id', String(venue.id)).order('pinned_at', { ascending: false, nullsFirst: false }).order('created_at', { ascending: false }).limit(300);
     if (e) setError('Fotoğraflar yüklenemedi. Yeniden dene.');
     else { setPhotos(data || []); setError(''); }
-    const { data: settings } = await supabase.from('venues').select('photo_closing_time').eq('id', venue.id).maybeSingle();
-    if (settings) { setClosing((settings.photo_closing_time || '').slice(0, 5)); onClosingChange?.(settings.photo_closing_time); }
   }, [venue.id]);
   useFocusEffect(useCallback(() => { if (active) load(); }, [load, active]));
   const pick = async () => {
@@ -51,18 +48,6 @@ export default function VenueAccountPhotos({ venue, isOwner, legacyPhotos = [], 
     } catch (e) { Alert.alert('Paylaşılamadı', e.message); }
     finally { lock.current = false; setBusy(false); }
   };
-  const saveClosing = async () => {
-    if (lock.current) return;
-    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(closing)) { Alert.alert('Kapanış saati', 'Saati 23:30 gibi SS:DD biçiminde yaz.'); return; }
-    lock.current = true; setBusy(true);
-    try {
-      const { error: e } = await supabase.rpc('set_venue_photo_closing', { p_venue_id: String(venue.id), p_close: closing });
-      if (e) throw e;
-      onClosingChange?.(closing);
-      Alert.alert('Kaydedildi', 'Ziyaretçi fotoğrafları bu kapanış saatinde kaldırılacak. Saat dilimi: Türkiye.');
-    } catch (e) { Alert.alert('Kaydedilemedi', e.message); }
-    finally { lock.current = false; setBusy(false); }
-  };
   const pin = async (photo) => {
     if (lock.current) return;
     lock.current = true; setBusy(true);
@@ -91,12 +76,7 @@ export default function VenueAccountPhotos({ venue, isOwner, legacyPhotos = [], 
   return <View style={{ paddingHorizontal: 20 }}>
     <Text style={{ fontSize: 19, fontWeight: '700', marginBottom: 12 }}>Mekanın Fotoğrafları</Text>
     <TouchableOpacity onPress={load} accessibilityLabel="Fotoğrafları yenile"><Text style={{ color: '#9B1B4D', paddingVertical: 8 }}>Yenile</Text></TouchableOpacity>
-    {isOwner && <View style={{ backgroundColor: '#FFF0F6', padding: 12, borderRadius: 12, marginVertical: 8 }}>
-      <Text style={{ fontWeight: '700' }}>Ziyaretçi fotoğrafları için kapanış saati</Text>
-      <TextInput accessibilityLabel="Mekan kapanış saati" placeholder="23:30" value={closing} onChangeText={setClosing} maxLength={5} keyboardType="numbers-and-punctuation" style={{ paddingVertical: 12 }} />
-      <TouchableOpacity disabled={busy} onPress={saveClosing}><Text style={{ color: '#9B1B4D', fontWeight: '700' }}>Saati kaydet</Text></TouchableOpacity>
-      <Text style={{ color: '#777', marginTop: 8 }}>En fazla 3 fotoğrafı sabitleyebilirsin. Diğerleri yeniden eskiye sıralanır.</Text>
-    </View>}
+    {isOwner && <Text style={{ color: '#777', marginVertical: 8 }}>Kendi fotoğraflarından en fazla 3 tanesini sabitleyebilirsin. Gezgin fotoğraflarını yalnızca paylaşan gezgin silebilir.</Text>}
     {isOwner && <TouchableOpacity disabled={busy || !!selected} onPress={pick}><Text style={{ color: '#AD285D', paddingVertical: 12 }}>+ Fotoğraf paylaş</Text></TouchableOpacity>}
     {selected && <View>
       <Image source={{ uri: selected.uri }} style={{ width: '100%', height: 220, borderRadius: 12 }} />

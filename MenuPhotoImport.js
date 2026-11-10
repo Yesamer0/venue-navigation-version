@@ -60,7 +60,7 @@ export default function MenuPhotoImport({ venueId, canManage = false, onImported
   if (!canManage) return null;
   return <View style={styles.card}>
     <Text style={styles.title}>Fotoğraftan menü ekle</Text>
-    <Text style={styles.help}>Menünün tamamı net ve düz görünsün. Fotoğraf yapay zekâyla ürün, kategori ve fiyatlara dönüştürülür; yeni ürünler eklenir, mevcut ürünlerin okunabilen fiyatları güncellenir. Fotoğraf galeriye eklenmez.</Text>
+    <Text style={styles.help}>Menünün tamamı net ve düz görünsün. Fotoğraf yapay zekâyla ürün, kategori ve fiyatlara dönüştürülür; yeni ürünler eklenir, fiyatlar güncellenir. Aynı ürünün eski boy seçenekleri yerine yeni fotoğraftaki seçenekler kullanılır. Fotoğraf galeriye eklenmez.</Text>
     {photo && <Image accessibilityLabel="Seçilen menü fotoğrafı" source={{ uri: photo.uri }} style={styles.preview} resizeMode="contain" />}
     {!!status && <Text accessibilityLiveRegion="polite" style={styles.status}>{status}</Text>}
     {!!error && <View accessibilityRole="alert" style={styles.error}><Text style={styles.errorText}>{error}</Text><Text style={styles.help}>Yeniden deneyebilir veya başka bir fotoğraf seçebilirsin.</Text></View>}

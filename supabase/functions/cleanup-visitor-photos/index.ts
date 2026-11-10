@@ -11,7 +11,18 @@ Deno.serve(async (request) => {
     if (queueError) throw queueError;
     const { data, error } = await client.from('expired_visitor_photo_files').select('storage_path').order('queued_at').limit(100);
     if (error) throw error;
-    const paths = (data || []).map(photo => photo.storage_path);
+    const queued = (data || []).map(photo => photo.storage_path);
+    // A surviving post must never lose its image, even if an old expiry queued the path.
+    const { data: living, error: livingError } = queued.length
+      ? await client.from('venue_moments').select('storage_path').in('storage_path', queued)
+      : { data: [], error: null };
+    if (livingError) throw livingError;
+    const protectedPaths = new Set((living || []).map(photo => photo.storage_path));
+    const paths = queued.filter(path => !protectedPaths.has(path));
+    if (protectedPaths.size) {
+      const { error: unqueueError } = await client.from('expired_visitor_photo_files').delete().in('storage_path', [...protectedPaths]);
+      if (unqueueError) throw unqueueError;
+    }
     if (paths.length) {
       const { error: storageError } = await client.storage.from('venue-moments').remove(paths);
       if (storageError) throw storageError;

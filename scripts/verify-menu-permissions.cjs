@@ -9,12 +9,12 @@ const travelerVenue = '44444444-4444-4444-8444-444444444444';
 const hash = 'a'.repeat(64);
 (async () => {
  const db = new PGlite();
- await db.exec(`create role anon; create role authenticated; create schema auth;
+ await db.exec(`create role anon; create role authenticated; create role service_role; create schema auth;
  create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
  grant usage on schema public,auth to authenticated;
  create table users(id uuid primary key,is_venue boolean);
  create table venues(id uuid primary key,owner_id uuid,name text,created_at timestamptz default now());
- create table menu_items(id serial primary key,venue_id uuid,name text,price numeric,category text,menu_group text);
+ create table menu_items(id serial primary key,venue_id uuid,name text,price numeric,category text,menu_group text,created_at timestamptz default now());
  create table venue_menu_imports(venue_id text,image_hash text,created_at timestamptz default now(),attempted_at timestamptz default now(),attempts int default 1,item_count int,primary key(venue_id,image_hash));
  insert into users values('${owner}',true),('${traveler}',false);
  insert into venues values('${businessVenue}','${owner}','deneme'),('${travelerVenue}','${traveler}','deneme');
@@ -23,9 +23,18 @@ const hash = 'a'.repeat(64);
  create policy old_menu_access on menu_items for all to authenticated using(true) with check(true);`);
  await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/migrations/20261110093000_menu_business_permissions.sql'),'utf8'));
  await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/migrations/20261110110000_menu_photo_product_sync.sql'),'utf8'));
+ await db.exec(`insert into menu_items(venue_id,name,price,category,created_at) values
+ ('${businessVenue}','Limonata (ev yapımı)',80,'İçecek',now()-interval '2 days'),('${businessVenue}','Limonata',90,'İçecek',now()-interval '1 day'),
+ ('${businessVenue}','Cappuccino Küçük',95,'İçecek',now()-interval '2 days'),('${businessVenue}','Cappuccino Büyük',115,'İçecek',now()-interval '2 days'),
+ ('${businessVenue}','Cappuccino (S)',155,'İçecek',now()-interval '1 day');`);
+ await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/migrations/20261110131000_menu_family_reconciliation.sql'),'utf8'));
+ assert.equal((await db.query("select name,price from menu_items where menu_family_key(name)='limonata'")).rows.length,1);
+ assert.equal(Number((await db.query("select price from menu_items where menu_family_key(name)='cappuccino'")).rows[0].price),155);
+ assert.equal((await db.query("select * from menu_items where menu_family_key(name)='cappuccino'")).rows.length,1);
+
  const login = id => db.exec(`reset role; set request.jwt.claim.sub='${id}'; set role authenticated;`);
  await login(traveler);
- assert.equal((await db.query('select * from menu_items')).rows.length,2);
+ assert.equal((await db.query('select * from menu_items')).rows.length,4);
  await assert.rejects(() => db.query('insert into menu_items(venue_id,name) values($1,$2)',[travelerVenue,'Bad']),/row-level security/);
  assert.equal((await db.query("update menu_items set name='Bad' returning id")).rows.length,0);
  assert.equal((await db.query('delete from menu_items returning id')).rows.length,0);
@@ -44,19 +53,28 @@ const hash = 'a'.repeat(64);
  assert.equal((await db.query('delete from menu_items where venue_id=$1 returning id',[travelerVenue])).rows.length,0);
  const sync=async(n,rows)=>{const h=n.toString(16).padStart(64,'0');await db.query('select reserve_venue_menu_import($1,$2)',[businessVenue,h]);return (await db.query('select commit_venue_menu_import($1,$2,$3) as n',[businessVenue,h,JSON.stringify(rows)])).rows[0].n;};
  const product=(name,price,category='Kahve')=>({name,price,category,menu_group:'icecek'});
- const latteId=(await db.query("select id from menu_items where name='Latte'")).rows[0].id;
+ const latteId=(await db.query("select id from menu_items where menu_product_key(name)='latte'")).rows[0].id;
  assert.equal(await sync(2,[product(' \tLATTE\t ',120),product('Espresso',90),product('LATTE',120),product('Latte Büyük',150)]),3);
- assert.equal((await db.query("select id,price from menu_items where name='Latte'")).rows[0].id,latteId);
+ assert.equal((await db.query("select id,price from menu_items where menu_product_key(name)='latte'")).rows[0].id,latteId);
  assert.equal((await db.query("select count(*)::int as n from menu_items where menu_product_key(name)='latte'")).rows[0].n,1);
  assert.equal(await sync(3,[product('latte',140,'Sıcak İçecek'),product('Espresso',null),product('Mocha',160),product('ÇAY',50)]),4);
- const prices=Object.fromEntries((await db.query('select name,price from menu_items')).rows.map(r=>[r.name,r.price]));
- assert.equal(Number(prices.Latte),140);assert.equal(Number(prices.Espresso),90);assert.equal(Number(prices.Mocha),160);assert.equal(Number(prices['Çay']),50);assert.equal(Number(prices['Latte Büyük']),150);
+ const prices=Object.fromEntries((await db.query('select menu_product_key(name) as name,price from menu_items')).rows.map(r=>[r.name,r.price]));
+ assert.equal(Number(prices.latte),140);assert.equal(Number(prices.espresso),90);assert.equal(Number(prices.mocha),160);assert.equal(Number(prices.cay),50);assert.equal(prices['buyuk latte'],undefined);
  // Cached older photo cannot roll newer prices back.
  assert.equal(await sync(2,[product('LATTE',120)]),3);
  assert.equal(Number((await db.query('select price from menu_items where id=$1',[latteId])).rows[0].price),140);
  assert.ok((await db.query("select 1 from menu_items where name='Owner item'")).rows.length);
  await assert.rejects(()=>sync(4,[product('New product',20),product('Ambiguous',30),product('Ambiguous',40)]),/farklı fiyatlarla/);
  assert.equal((await db.query("select 1 from menu_items where name in ('New product','Ambiguous')")).rows.length,0);
+ // Typography, word order and known size spelling share identity; families follow the new page.
+ assert.equal((await db.query("select menu_product_key('Demlik Çay')=menu_product_key('Çay (demlik)') as same")).rows[0].same,true);
+ assert.equal((await db.query("select menu_product_key('Latte (S)')=menu_product_key('LATTE Küçük') as same")).rows[0].same,true);
+ assert.equal(await sync(5,[product('Latte (S)',155)]),1);
+ assert.equal((await db.query("select count(*)::int as n from menu_items where menu_family_key(name)='latte'")).rows[0].n,1);
+ assert.equal(await sync(6,[product('Latte Küçük',165),product('Latte Büyük',185)]),2);
+ assert.equal((await db.query("select count(*)::int as n from menu_items where menu_family_key(name)='latte'")).rows[0].n,2);
+ await assert.rejects(()=>db.query("insert into menu_items(venue_id,name) values($1,'Latte (S)')",[businessVenue]),/unique constraint/);
+ await db.exec('reset role');assert.ok((await db.query('select * from menu_merge_archive')).rows.length>0);
  await db.close();
  console.log('PASS: traveler read-only even for owned venue; business owner writes/imports; foreign owner denied; retry/idempotency; shared demo cafe; product upsert/new prices/null protection/variant preservation/atomic ambiguity rejection');
 })().catch(error => {console.error(error);process.exitCode=1;});
