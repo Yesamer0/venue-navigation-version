@@ -39,3 +39,5 @@
 - These automated/live API tests do not replace checking final layout and interactions on the user's physical phone. Remote push registration is skipped in Expo Go; app build/project configuration remains a separate release task.
 
 Final verification: all six local verification scripts and iOS export (1257 modules) passed. Live checks found zero temporary test users/cafes, one surviving original visitor photo, no expiring posts and zero duplicate menu identities. The Expo tunnel was restarted after a DNS failure.
+
+Category normalization: case, Turkish accents and whitespace no longer split category headings. Existing hot drink variants are stored as Sıcak İçecekler; inserts and manual edits use the same canonical label through a DB trigger. The UI also merges equivalent headings defensively. Live verification found one hot-drink category containing eight products; every product ID/name/price remained unchanged. Test: node scripts/verify-menu-categories.cjs. Migration 20261110143000 is applied.

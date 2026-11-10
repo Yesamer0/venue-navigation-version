@@ -1,0 +1,19 @@
+const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),ts=require('typescript'),assert=require('node:assert/strict');
+const {PGlite}=require('@electric-sql/pglite');
+const root=path.join(__dirname,'..'),exports_={};
+vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(root,'menuGrouping.js'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports:exports_});
+(async()=>{
+ const samples=[{category:'SICAK İÇECEKLER',name:'Latte',price:155},{category:' Sıcak   İçecekler ',name:'Çay',price:25},{category:'sicak icecekler',name:'Espresso',price:65},{category:'SOĞUK İÇECEKLER',name:'Su',price:20}];
+ const grouped=exports_.groupMenuCategories(samples);
+ assert.deepEqual(Object.keys(grouped),['Sıcak İçecekler','Soğuk İçecekler']);assert.equal(grouped['Sıcak İçecekler'].length,3);
+ assert.deepEqual(samples.map(x=>x.price),[155,25,65,20]);
+ const db=new PGlite();
+ await db.exec(`create table menu_items(id serial primary key,venue_id int,name text,price numeric,category text,created_at timestamptz default now());insert into menu_items(venue_id,name,price,category) values(1,'Latte',155,'SICAK İÇECEKLER'),(1,'Çay',25,'Sıcak İçecekler');`);
+ await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261110143000_normalize_menu_categories.sql'),'utf8'));
+ assert.equal((await db.query('select distinct category from menu_items')).rows.length,1);
+ await db.query("insert into menu_items(venue_id,name,price,category) values(1,'Espresso',65,'sicak  icecekler')");
+ await db.query("update menu_items set category=' SICAK İÇECEKLER ' where name='Çay'");
+ assert.equal((await db.query('select distinct category from menu_items')).rows[0].category,'Sıcak İçecekler');
+ assert.deepEqual((await db.query('select price from menu_items order by id')).rows.map(x=>Number(x.price)),[155,25,65]);
+ await db.close();console.log('PASS: UI case/accent/spacing variants form one category; existing rows, new imports and manual edits normalized; products/prices preserved');
+})().catch(e=>{console.error(e);process.exitCode=1;});

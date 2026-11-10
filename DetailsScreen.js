@@ -20,7 +20,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import VenueMoments from './VenueMoments';
 import MenuPhotoImport from './MenuPhotoImport';
 import VenueAccountPhotos from './VenueAccountPhotos';
-import { getMenuGroup } from './menuGrouping';
+import { getMenuGroup, groupMenuCategories } from './menuGrouping';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 let presenceSubscriptionSequence = 0;
@@ -729,12 +729,7 @@ const taggedPhotos = venuePhotos.filter(
   const itemsInActiveGroup = menuItems.filter(
     (m) => getMenuGroup(m.category, m.name, m.menu_group) === activeMenuGroup
   );
-  const groupedByCategory = {};
-  itemsInActiveGroup.forEach((m) => {
-    const cat = m.category || 'Diğer';
-    if (!groupedByCategory[cat]) groupedByCategory[cat] = [];
-    groupedByCategory[cat].push(m);
-  });
+  const groupedByCategory = groupMenuCategories(itemsInActiveGroup);
 
   const handleSendReview = async () => {
     if (userRating === 0) {

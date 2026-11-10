@@ -4,6 +4,30 @@ function normalized(value) {
     .replace(/ç/g, 'c').replace(/ö/g, 'o').replace(/ü/g, 'u');
 }
 
+export function getMenuCategoryKey(value) {
+  return normalized(String(value || '').normalize('NFKC')).replace(/&/g, ' ve ')
+    .replace(/[^a-z0-9]+/g, ' ').trim().replace(/\s+/g, ' ') || 'diger';
+}
+
+export function getMenuCategoryLabel(value) {
+  const key = getMenuCategoryKey(value);
+  return new Map([['sicak icecekler', 'Sıcak İçecekler'], ['soguk icecekler', 'Soğuk İçecekler'],
+    ['sandvic ve tost', 'Sandviç & Tost'], ['diger', 'Diğer']]).get(key)
+    || String(value || '').normalize('NFKC').trim().replace(/\s+/g, ' ') || 'Diğer';
+}
+
+export function groupMenuCategories(items) {
+  const labels = new Map();
+  const groups = Object.create(null);
+  for (const item of items) {
+    const key = getMenuCategoryKey(item.category);
+    if (!labels.has(key)) labels.set(key, getMenuCategoryLabel(item.category));
+    const label = labels.get(key);
+    (groups[label] ||= []).push(item);
+  }
+  return groups;
+}
+
 export function getMenuGroup(category, name = '', storedGroup = null) {
   if (['yiyecek', 'icecek', 'diger'].includes(storedGroup)) return storedGroup;
   const heading = normalized(category);
