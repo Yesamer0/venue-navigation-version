@@ -12,6 +12,7 @@ import {
   Platform
 } from 'react-native';
 import { supabase } from './supabase';
+import { signOutVenue } from './authService';
 import { useFocusEffect } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 
@@ -257,10 +258,8 @@ const addGalleryPhoto = async (venue) => {
   };
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    // VenueOwnerScreen artık ProfileStack içinde yaşıyor, o da Tab
-    // Navigator içinde, o da kök Stack içinde — iki kat yukarı çıkıyoruz.
-    navigation.getParent()?.getParent()?.replace('Auth');
+    try { await signOutVenue(); }
+    catch (failure) { alert(failure.message); }
   };
 
   return (

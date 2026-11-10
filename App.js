@@ -1,6 +1,6 @@
 import 'react-native-gesture-handler';
 import React, { useEffect } from 'react';
-import { Platform, View, ActivityIndicator } from 'react-native';
+import { Platform, View, Text, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { useFonts, Chewy_400Regular } from '@expo-google-fonts/chewy';
@@ -10,6 +10,8 @@ import * as Notifications from 'expo-notifications';
 // Screens
 import AuthScreen from './AuthScreen';
 import MainTabs from './MainTabs';
+import { AuthProvider, useAuth } from './AuthProvider';
+import { signOutVenue } from './authService';
 
 const Stack = createStackNavigator();
 
@@ -25,47 +27,25 @@ if (Platform.OS !== 'web') {
   });
 }
 
-// Request notification permission
-const requestNotificationPermission = async () => {
-  if (Platform.OS === 'web') {
-    return false;
-  }
-
-  try {
-    const { status: existingStatus } =
-      await Notifications.getPermissionsAsync();
-
-    let finalStatus = existingStatus;
-
-    if (existingStatus !== 'granted') {
-      const { status } =
-        await Notifications.requestPermissionsAsync();
-
-      finalStatus = status;
-    }
-
-    if (finalStatus !== 'granted') {
-      console.log('Notification permission denied');
-      return false;
-    }
-
-    console.log('Notification permission granted');
-    return true;
-  } catch (error) {
-    console.log('Notification permission error:', error);
-    return false;
-  }
-};
+function RootNavigator() {
+  const { session, profile, loading, error, retry } = useAuth();
+  if (loading) return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFF0F5' }}><ActivityIndicator color="#C2185B" /><Text style={{ marginTop: 12 }}>Hesabın hazırlanıyor…</Text></View>;
+  if (error) return <View style={{ flex: 1, justifyContent: 'center', padding: 28, backgroundColor: '#FFF0F5' }}>
+    <Text accessibilityRole="alert" style={{ color: '#9B1B4D', lineHeight: 23 }}>{error}</Text>
+    <TouchableOpacity onPress={retry}><Text style={{ color: '#9B1B4D', fontWeight: '700', paddingVertical: 18 }}>Tekrar dene</Text></TouchableOpacity>
+    <TouchableOpacity onPress={() => signOutVenue().catch(failure => Alert.alert('Çıkış yapılamadı', failure.message))}><Text style={{ color: '#666', paddingVertical: 12 }}>Çıkış yap</Text></TouchableOpacity>
+  </View>;
+  return <NavigationContainer>
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      {session && profile ? <Stack.Screen name="Main" component={MainTabs} navigationKey={session.user.id} /> : <Stack.Screen name="Auth" component={AuthScreen} />}
+    </Stack.Navigator>
+  </NavigationContainer>;
+}
 
 export default function App() {
   const [fontsLoaded] = useFonts({
     Chewy_400Regular,
   });
-
-  // Request permission when the app starts
-  useEffect(() => {
-    requestNotificationPermission();
-  }, []);
 
   // Keep web layout working correctly
   useEffect(() => {
@@ -103,28 +83,5 @@ export default function App() {
     );
   }
 
-  return (
-    <NavigationContainer>
-      <Stack.Navigator
-        initialRouteName="Auth"
-        screenOptions={{
-          headerStyle: { backgroundColor: '#fff' },
-          headerTintColor: '#D8A7B1',
-          headerTitleStyle: { fontWeight: 'bold' },
-        }}
-      >
-        <Stack.Screen
-          name="Auth"
-          component={AuthScreen}
-          options={{ headerShown: false }}
-        />
-
-        <Stack.Screen
-          name="Main"
-          component={MainTabs}
-          options={{ headerShown: false }}
-        />
-      </Stack.Navigator>
-    </NavigationContainer>
-  );
+  return <AuthProvider><RootNavigator /></AuthProvider>;
 }

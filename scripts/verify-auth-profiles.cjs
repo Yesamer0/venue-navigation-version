@@ -1,0 +1,27 @@
+const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
+const {PGlite}=require('@electric-sql/pglite');
+const owner='11111111-1111-4111-8111-111111111111',traveler='22222222-2222-4222-8222-222222222222',newId='33333333-3333-4333-8333-333333333333',duplicate='44444444-4444-4444-8444-444444444444';
+(async()=>{
+ const db=new PGlite();
+ await db.exec(`create role anon;create role authenticated;create schema auth;
+ create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
+ create table auth.users(id uuid primary key,email text,raw_user_meta_data jsonb);
+ create table public.users(id uuid primary key,username text,name text,email text unique,is_venue boolean,password text);
+ insert into auth.users values('${owner}','old-owner@example.invalid','{"username":"old_owner","is_venue":true}'),('${traveler}','old-traveler@example.invalid','{"username":"old_traveler","is_venue":true}');
+ insert into public.users(id,username,email,is_venue) values('${traveler}','existing_traveler','old-traveler@example.invalid',false);
+ grant usage on schema public,auth to anon,authenticated;
+ grant select on public.users to authenticated;alter table public.users enable row level security;create policy own_profile on public.users for select to authenticated using(id=auth.uid());`);
+ await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/migrations/20261110160000_atomic_auth_profiles.sql'),'utf8'));
+ await db.query('insert into auth.users values($1,$2,$3)',[newId,'new@example.invalid',JSON.stringify({username:'New_Traveler',is_venue:false})]);
+ assert.equal((await db.query('select is_venue from public.users where id=$1',[newId])).rows[0].is_venue,false);
+ await assert.rejects(()=>db.query('insert into auth.users values($1,$2,$3)',[duplicate,'duplicate@example.invalid',JSON.stringify({username:' new_traveler '})]),/unique constraint/);
+ assert.equal((await db.query('select * from auth.users where id=$1',[duplicate])).rows.length,0);
+ await db.exec('set role anon');assert.equal((await db.query("select is_username_available('NEW_TRAVELER') as available")).rows[0].available,false);
+ await assert.rejects(()=>db.query('select * from ensure_current_profile()'),/permission denied/);
+ await db.exec(`reset role;set request.jwt.claim.sub='${owner}';set role authenticated`);
+ const repaired=(await db.query('select * from ensure_current_profile()')).rows[0];assert.equal(repaired.id,owner);assert.equal(repaired.is_venue,true);assert.ok(!('password' in repaired));assert.ok(!('email' in repaired));
+ await db.exec(`reset role;set request.jwt.claim.sub='${traveler}';set role authenticated`);
+ assert.equal((await db.query('select * from ensure_current_profile()')).rows[0].is_venue,false);
+ assert.equal((await db.query('select * from public.users')).rows.length,1);
+ await db.close();console.log('PASS: signup/profile atomic; duplicate username rolls signup back; availability works anonymously; missing profile repaired only for self; existing role preserved; no password/email returned');
+})().catch(e=>{console.error(e);process.exitCode=1;});

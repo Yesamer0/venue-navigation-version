@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { 
   View, 
   Text, 
@@ -6,180 +6,53 @@ import {
   TouchableOpacity, 
   StyleSheet, 
   ActivityIndicator,
-  Platform 
+  Platform, KeyboardAvoidingView, ScrollView 
 } from 'react-native';
 import { supabase } from './supabase';
-import { registerForPushNotificationsAsync } from './pushNotifications';
+import { authErrorMessage, validateAuthInput } from './authService';
 
 export default function AuthScreen({ navigation }) {
+  const lock = useRef(false);
+  const [formError, setFormError] = useState('');
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState(''); 
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [isRegisterMode, setIsRegisterMode] = useState(true); 
+  const [isRegisterMode, setIsRegisterMode] = useState(false); 
   const [isVenueOwner, setIsVenueOwner] = useState(false);
 
   const handleAuth = async () => {
-  if (isRegisterMode && (!username || !email || !password)) {
-    alert("Lütfen tüm alanları doldurun.");
-    return;
-  }
-
-  if (!isRegisterMode && (!email || !password)) {
-    alert("Lütfen e-posta ve şifre alanlarını doldurun.");
-    return;
-  }
-
-  setLoading(true);
-
-  if (isRegisterMode) {
-    if (password.length < 7 || password.length > 20) {
-      alert("Şifre en az 7, en fazla 20 karakter uzunluğunda olmalıdır.");
-      setLoading(false);
-      return;
-    }
-
+    if (lock.current) return;
+    setFormError('');
+    let input;
+    try { input = validateAuthInput({ username, email, password, registering: isRegisterMode }); }
+    catch (failure) { setFormError(failure.message); return; }
+    lock.current = true; setLoading(true);
     try {
-      // Check whether the username already exists
-      const { data: existingUser, error: checkError } = await supabase
-        .from('users')
-        .select('username')
-        .eq('username', username)
-        .maybeSingle();
-
-      if (checkError) {
-        console.log('USERNAME CHECK ERROR:', checkError);
-        alert(
-          "Kullanıcı adı kontrol edilirken bir hata oluştu: " +
-          checkError.message
-        );
-        return;
+      if (isRegisterMode) {
+        const { data: available, error: checkError } = await supabase.rpc('is_username_available', { p_username: input.username });
+        if (checkError) throw checkError;
+        if (!available) { setFormError('Bu kullanıcı adı kullanılıyor. Başka bir ad seç.'); return; }
+        const { data, error } = await supabase.auth.signUp({ email: input.email, password: input.password,
+          options: { data: { username: input.username, is_venue: isVenueOwner } },
+        });
+        if (error) throw error;
+        if (!data?.session) {
+          setIsRegisterMode(false); setPassword('');
+          alert('Hesabını tamamlamak için e-postandaki doğrulama bağlantısını aç, ardından giriş yap.');
+        }
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({ email: input.email, password: input.password });
+        if (error) throw error;
       }
-
-      if (existingUser) {
-        alert(
-          "Bu kullanıcı adı başkası tarafından alınmış. Lütfen farklı bir isim seçin."
-        );
-        return;
-      }
-
-      // Create Supabase Auth account
-      const { data: signUpData, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            username,
-            is_venue: isVenueOwner,
-          },
-        },
-      });
-
-      if (error) throw error;
-
-      const userId = signUpData?.user?.id;
-
-      if (!userId) {
-        alert(
-          "Kayıt Hatası: Kullanıcı kimliği alınamadı. Lütfen tekrar deneyin."
-        );
-        return;
-      }
-
-      // Save user profile
-      const { error: insertError } = await supabase
-        .from('users')
-        .insert([
-          {
-            id: userId,
-            username,
-            name: username,
-            email,
-            is_venue: isVenueOwner,
-          },
-        ]);
-
-      if (insertError) {
-        console.log('USER PROFILE INSERT ERROR:', insertError);
-
-        alert(
-          "Kayıt Hatası: Hesabınız oluşturuldu fakat profil bilgileriniz kaydedilemedi.\n\n" +
-          "Detay: " + insertError.message + "\n\n" +
-          "Bu genelde Supabase'de 'Confirm email' ayarı açıkken veya 'users' " +
-          "tablosunda uygun bir RLS INSERT politikası yokken oluşur."
-        );
-
-        return;
-      }
-
-      alert("Kayıt başarılı! Şimdi giriş yapabilirsiniz.");
-      setIsRegisterMode(false);
-
-    } catch (error) {
-      alert("Kayıt Hatası: " + error.message);
-    } finally {
-      setLoading(false);
-    }
-
-  } else {
-    try {
-      // Sign in
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) throw error;
-
-      const loginUserId = data?.user?.id;
-
-      if (!loginUserId) {
-        throw new Error('User ID is missing after login.');
-      }
-
-      // Fetch user role
-      const { data: userData, error: fetchError } = await supabase
-        .from('users')
-        .select('is_venue')
-        .eq('id', loginUserId)
-        .single();
-
-      if (fetchError) {
-        console.log('USER ROLE FETCH ERROR:', fetchError);
-
-        alert(
-          "Giriş yapıldı fakat profil bilgileriniz bulunamadı.\n\n" +
-          "Detay: " + fetchError.message
-        );
-
-        return;
-      }
-
-      // Register push token without blocking login
-      try {
-        await registerForPushNotificationsAsync(loginUserId);
-      } catch (notificationError) {
-        console.log(
-          'PUSH NOTIFICATION REGISTRATION ERROR:',
-          notificationError
-        );
-      }
-
-      alert("Başarıyla giriş yapıldı!");
-
-      // Navigate to the main application
-      navigation.replace('Main');
-
-    } catch (error) {
-      alert("Giriş Hatası: " + error.message);
-    } finally {
-      setLoading(false);
-    }
-  }
-};
+      // The root auth listener selects the authenticated screen and clears old navigation history.
+    } catch (failure) { setFormError(authErrorMessage(failure)); }
+    finally { lock.current = false; setLoading(false); }
+  };
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}>
+      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', width: '100%' }} style={{ width: '100%' }}>
       <View style={styles.card}>
         <Text style={styles.title}>Venue</Text>
         <Text style={styles.subtitle}>
@@ -189,6 +62,7 @@ export default function AuthScreen({ navigation }) {
         {isRegisterMode && (
           <TextInput
             style={styles.input}
+          editable={!loading}
             placeholder="Kullanıcı Adı"
             value={username}
             onChangeText={setUsername}
@@ -200,7 +74,10 @@ export default function AuthScreen({ navigation }) {
 
         <TextInput
           style={styles.input}
+          editable={!loading}
           placeholder="E-posta Adresi"
+          textContentType="emailAddress"
+          autoComplete="email"
           value={email}
           onChangeText={setEmail}
           autoCapitalize="none"
@@ -210,7 +87,10 @@ export default function AuthScreen({ navigation }) {
 
         <TextInput
           style={styles.input}
+          editable={!loading}
           placeholder="Şifre"
+          textContentType={isRegisterMode ? 'newPassword' : 'password'}
+          autoComplete={isRegisterMode ? 'new-password' : 'current-password'}
           value={password}
           onChangeText={setPassword}
           secureTextEntry
@@ -221,7 +101,7 @@ export default function AuthScreen({ navigation }) {
         {isRegisterMode && (
           <TouchableOpacity 
             style={[styles.checkboxRow, isVenueOwner && styles.checkboxRowActive]}
-            onPress={() => setIsVenueOwner(!isVenueOwner)}
+            disabled={loading} onPress={() => setIsVenueOwner(!isVenueOwner)}
           >
             <View style={[styles.checkboxCircle, isVenueOwner && styles.checkboxCircleChecked]} />
             <Text style={[styles.checkboxLabel, isVenueOwner && styles.checkboxLabelActive]}>
@@ -230,17 +110,19 @@ export default function AuthScreen({ navigation }) {
           </TouchableOpacity>
         )}
 
-        <TouchableOpacity style={styles.button} onPress={handleAuth} disabled={loading}>
+        {!!formError && <Text accessibilityRole="alert" style={{ color: '#B42318', lineHeight: 21, marginBottom: 12 }}>{formError}</Text>}
+        <TouchableOpacity accessibilityRole="button" style={styles.button} onPress={handleAuth} disabled={loading}>
           {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>{isRegisterMode ? 'Kayıt Ol' : 'Giriş Yap'}</Text>}
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => setIsRegisterMode(!isRegisterMode)} style={styles.switchButton}>
+        <TouchableOpacity disabled={loading} onPress={() => { setIsRegisterMode(!isRegisterMode); setFormError(''); }} style={styles.switchButton}>
           <Text style={styles.switchText}>
             {isRegisterMode ? 'Zaten hesabınız var mı? Giriş Yapın' : 'Hesabınız yok mu? Kayıt Olun'}
           </Text>
         </TouchableOpacity>
       </View>
-    </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 

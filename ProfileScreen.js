@@ -13,6 +13,7 @@ import {
   Image // EKLENDİ: Fotoğrafları göstermek için
 } from 'react-native';
 import { supabase } from './supabase';
+import { signOutVenue } from './authService';
 import MomentFeed from './MomentFeed';
 
 export default function ProfileScreen({ navigation }) {
@@ -304,11 +305,8 @@ const handleCreateCollection = async () => {
 };
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    // ProfileScreen artık ProfileStack (Profil sekmesinin kendi iç
-    // gezinmesi) içinde yaşıyor, o da Tab Navigator içinde, o da kök
-    // Stack içinde. 'Auth' kök Stack'te olduğu için iki kat yukarı çıkmamız lazım.
-    navigation.getParent()?.getParent()?.replace('Auth');
+    try { await signOutVenue(); }
+    catch (failure) { alert(failure.message); }
   };
 
   return (
