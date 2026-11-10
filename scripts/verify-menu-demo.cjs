@@ -1,58 +1,24 @@
-const fs = require('node:fs');
-const vm = require('node:vm');
-const assert = require('node:assert/strict');
-const ts = require('typescript');
-const path = require('node:path');
-const root = path.join(__dirname, '..');
-function load(file, modules) {
-  const exports = {};
-  const code = ts.transpileModule(fs.readFileSync(path.join(root, file), 'utf8'), {
-    compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.React, target: ts.ScriptTarget.ES2022 },
-  }).outputText;
-  vm.runInNewContext(code, { exports, require: id => modules[id], Date, Number, Math, Error, Uint8Array });
-  return exports;
-}
-const react = { useRef: () => ({ current: false }), useState: v => [v, () => {}],
-  createElement: (type, props, ...children) => ({ type, props, children }) };
-react.default = react;
-let imported = 0, converted = 0, alerts = [], failGPS = false, cafe = null, inserts = 0;
-const coords = { latitude: 37.1, longitude: 28.2, accuracy: 10 };
-const gps = { requestForegroundPermissionsAsync: async () => ({ status: 'granted' }),
-  hasServicesEnabledAsync: async () => true, Accuracy: { High: 4 },
-  getCurrentPositionAsync: async () => ({ coords: { ...coords, accuracy: failGPS ? 90 : 10 }, timestamp: Date.now() }) };
-const { getFreshLocation } = load('deviceLocation.js', { 'expo-location': gps });
-const native = { View: 'View', Text: 'Text', TouchableOpacity: 'Button', ActivityIndicator: 'Spinner', Alert: { alert: (...v) => alerts.push(v) } };
-const supabase = {
-  auth: { getUser: async () => ({ data: { user: { id: 'owner' } } }), getSession: async () => ({ data: { session: {} } }) },
-  functions: { invoke: async (name, { body }) => {
-    assert.equal(name, 'import-menu'); assert.equal(body.image, 'jpeg-base64'); assert.equal(body.mimeType, 'image/jpeg');
-    imported++; return { data: { count: 2 } };
-  } },
-  from: () => {
-    const query = { select: () => query, eq: () => query, order: () => query, limit: () => query,
-      maybeSingle: async () => ({ data: cafe }),
-      insert: row => { inserts++; cafe = { ...row, id: 1 }; return query; },
-      update: row => { cafe = { ...cafe, ...row }; return query; }, single: async () => ({ data: cafe }) };
-    return query;
-  },
-};
-function buttons(tree) { return [tree, ...tree.children.flat(Infinity).filter(v => v && typeof v === 'object').flatMap(buttons)].filter(v => v.type === 'Button'); }
-(async () => {
-  assert.equal((await getFreshLocation()).coords.accuracy, 10);
-  failGPS = true; await assert.rejects(getFreshLocation, /GPS/); failGPS = false;
-  const Demo = load('DemoCafeButton.js', { react, 'react-native': native, './supabase': { supabase }, './deviceLocation': { getFreshLocation } }).default;
-  const navigate = (screen, { item }) => { assert.equal(screen, 'Details'); assert.equal(item.name, 'deneme'); assert.equal(item.latitude, coords.latitude); };
-  const demo = buttons(Demo({ navigation: { navigate } }))[0];
-  await demo.props.onPress(); await demo.props.onPress(); assert.equal(inserts, 1);
-  const picker = { requestCameraPermissionsAsync: async () => ({ granted: true }),
-    launchCameraAsync: async () => ({ assets: [{ uri: 'file:///menu.heic', width: 4000, height: 3000 }] }),
-    launchImageLibraryAsync: async () => ({ assets: [{ uri: 'file:///menu.png', width: 4000, height: 3000 }] }) };
-  const Menu = load('MenuPhotoImport.js', { react, 'react-native': native, 'expo-image-picker': picker,
-    'expo-image-manipulator': { SaveFormat: { JPEG: 'jpeg' }, manipulateAsync: async (uri, actions, options) => {
-      assert.equal(actions[0].resize.width, 2400); assert.equal(options.format, 'jpeg'); converted++; return { base64: 'jpeg-base64' };
-    } }, './supabase': { supabase }, './momentApi': { decodePhoto: b => { assert.equal(b, 'jpeg-base64'); return { contentType: 'image/jpeg' }; } } }).default;
-  const menu = buttons(Menu({ venueId: 1, onImported: async () => {} }));
-  await menu[0].props.onPress(); await menu[1].props.onPress();
-  assert.equal(imported, 2); assert.equal(converted, 2); assert.equal(alerts.length, 2);
-  console.log('PASS: accurate GPS, inaccurate GPS rejection, deneme cafe reuse, camera/gallery JPEG preparation and import');
-})().catch(error => { console.error(error); process.exitCode = 1; });
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict'),ts=require('typescript'),path=require('node:path');
+function load(file,modules){const exports={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(__dirname,'..',file),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.React,target:ts.ScriptTarget.ES2022}}).outputText,{exports,require:id=>modules[id],Date,Number,Math,Error,Uint8Array});return exports;}
+let slots=[],hook=0;const react={useRef:v=>{const i=hook++;return slots[i]??=( {current:v});},useState:v=>{const i=hook++;if(!(i in slots))slots[i]=v;return [slots[i],value=>{slots[i]=value;}];},createElement:(type,props,...children)=>({type,props,children})};react.default=react;
+const native={View:'View',Text:'Text',Image:'Image',TouchableOpacity:'Button',ActivityIndicator:'Spinner',Alert:{alert:()=>{}},StyleSheet:{create:x=>x}};
+const nodes=t=>!t||typeof t!=='object'?[]:[t,...t.children.flat(Infinity).flatMap(nodes)];
+const buttons=t=>nodes(t).filter(n=>n.type==='Button');
+let calls=0,converted=0,mode='success',refreshed=0;
+const api={auth:{getUser:async()=>({data:{user:{id:'owner'}}})},functions:{invoke:async(name,{body})=>{calls++;assert.equal(body.image,'jpeg-data');assert.equal(body.mimeType,'image/jpeg');if(mode==='error')return {error:{context:{json:async()=>({error:'Servis zaman asimi'})}}};return {data:{count:3}};}}};
+const picker={requestCameraPermissionsAsync:async()=>({granted:true}),launchCameraAsync:async()=>({assets:[{uri:'menu.heic',width:4000,height:3000}]}),launchImageLibraryAsync:async()=>({assets:[{uri:'menu.png',width:4000,height:3000}]})};
+const Menu=load('MenuPhotoImport.js',{react,'react-native':native,'expo-image-picker':picker,'expo-image-manipulator':{SaveFormat:{JPEG:'jpeg'},manipulateAsync:async(uri,actions,options)=>{assert.equal(actions[0].resize.width,2400);assert.equal(options.format,'jpeg');converted++;return {uri:'prepared.jpg',base64:'jpeg-data'};}},'./supabase':{supabase:api},'./momentApi':{decodePhoto:()=>({contentType:'image/jpeg'})}}).default;
+const render=(allowed=true)=>{hook=0;return Menu({venueId:'venue',canManage:allowed,onImported:async()=>{refreshed++;return true;}});};
+(async()=>{
+ assert.equal(render(false),null);assert.equal(calls,0);
+ for(const camera of [false,true]){slots=[];let tree=render();await buttons(tree)[camera?1:0].props.onPress();tree=render();assert.equal(nodes(tree).filter(n=>n.type==='Image').length,1);assert.equal(calls,camera?1:0);await buttons(tree)[0].props.onPress();tree=render();assert.equal(nodes(tree).filter(n=>n.type==='Image').length,0);}
+ assert.equal(calls,2);assert.equal(converted,2);assert.equal(refreshed,2);
+ slots=[];await buttons(render())[0].props.onPress();mode='error';await buttons(render())[0].props.onPress();let tree=render();assert.equal(nodes(tree).filter(n=>n.type==='Image').length,1);assert.ok(nodes(tree).some(n=>n.children.includes('Servis zaman asimi')));mode='success';await buttons(tree)[0].props.onPress();assert.equal(nodes(render()).filter(n=>n.type==='Image').length,0);
+ let business=false,gps=0,inserts=0,updates=0,cafe=null,opened=[];
+ const demoApi={auth:api.auth,rpc:async()=>({data:{id:'shared-business-cafe',name:'deneme'}}),from:table=>{const q={select:()=>q,eq:()=>q,order:()=>q,limit:()=>q,maybeSingle:async()=>({data:table==='users'?{is_venue:business}:cafe}),insert:row=>{inserts++;cafe={...row,id:'owner-cafe'};return q;},update:row=>{updates++;cafe={...cafe,...row};return q;},single:async()=>({data:cafe})};return q;}};
+ const Demo=load('DemoCafeButton.js',{react,'react-native':native,'./supabase':{supabase:demoApi},'./deviceLocation':{getFreshLocation:async()=>{gps++;return {coords:{latitude:37,longitude:28}};}}}).default;
+ slots=[];hook=0;let demo=Demo({navigation:{navigate:(screen,{item})=>opened.push(item)}});
+ await buttons(demo)[0].props.onPress();assert.equal(opened[0].id,'shared-business-cafe');assert.equal(inserts,0);assert.equal(gps,0);
+ business=true;slots=[];hook=0;demo=Demo({navigation:{navigate:(screen,{item})=>opened.push(item)}});await buttons(demo)[0].props.onPress();await buttons(demo)[0].props.onPress();assert.equal(inserts,1);assert.equal(updates,1);assert.equal(gps,2);assert.equal(cafe.name,'deneme');
+ console.log('PASS: traveler importer hidden; gallery/camera preview then save; JPEG preparation; real server error preserved; failed photo retry; success refresh');
+})().catch(e=>{console.error(e);process.exitCode=1;});

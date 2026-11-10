@@ -10,9 +10,18 @@ export default function DemoCafeButton({ navigation }) {
     if (lock.current) return;
     lock.current = true; setBusy(true);
     try {
-      const position = await getFreshLocation();
       const { data: auth, error: authError } = await supabase.auth.getUser();
       if (authError || !auth.user) throw new Error('Önce giriş yap.');
+      const { data: profile, error: roleError } = await supabase.from('users').select('is_venue').eq('id', auth.user.id).maybeSingle();
+      if (roleError) throw roleError;
+      if (profile?.is_venue !== true) {
+        const { data: cafe, error } = await supabase.rpc('get_demo_cafe');
+        if (error) throw error;
+        if (!cafe) throw new Error('Deneme kafesini önce mekan hesabından oluştur.');
+        navigation.navigate('Details', { item: cafe });
+        return;
+      }
+      const position = await getFreshLocation();
       const { data: existing, error: lookupError } = await supabase.from('venues').select('*')
         .eq('owner_id', auth.user.id).eq('name', 'deneme').order('id').limit(1).maybeSingle();
       if (lookupError) throw lookupError;
@@ -30,8 +39,8 @@ export default function DemoCafeButton({ navigation }) {
   };
   return <View style={{ padding: 16 }}>
     <TouchableOpacity accessibilityRole="button" disabled={busy} onPress={open}>
-      <Text style={{ color: '#9B1B4D', fontWeight: '700' }}>{busy ? 'GPS konumun alınıyor…' : '☕ Konumumda deneme kafesi aç'}</Text>
+      <Text style={{ color: '#9B1B4D', fontWeight: '700' }}>{busy ? 'Deneme kafesi açılıyor…' : '☕ deneme kafesini aç'}</Text>
     </TouchableOpacity>
-    <Text style={{ color: '#666', marginTop: 6 }}>Kendi deneme kafeni güncel konumunda aç. Menü fotoğrafı ekleyebilir ve normal check-in akışını deneyebilirsin. Tekrar açınca aynı kafenin konumu güncellenir.</Text>
+    <Text style={{ color: '#666', marginTop: 6 }}>Mekan hesabı kafeyi güncel konumunda hazırlar. Gezgin hesabı aynı kafeyi ziyaret eder ve check-in yapabilir.</Text>
   </View>;
 }

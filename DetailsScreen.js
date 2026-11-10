@@ -174,8 +174,8 @@ export default function DetailsScreen({ route, navigation }) {
         .maybeSingle();
 
       setCurrentUser({ id: authUser.id, username: profile?.username || 'Gezgin' });
-      setIsOwner(item.owner_id === authUser.id);
-      setIsVenueAccount(profile?.is_venue === true || item.owner_id === authUser.id);
+      setIsOwner(profile?.is_venue === true && item.owner_id === authUser.id);
+      setIsVenueAccount(profile?.is_venue === true);
 
       // Kullanıcının bu mekanı daha önce favorileyip favorilemediğini kontrol et
       // Kullanıcının bu mekanı daha önce favorileyip favorilemediğini kontrol et
@@ -678,6 +678,8 @@ await fetchCheckInStatus(authUser.id);
 
     if (error) {
       console.log('Menü çekme hatası:', error);
+      setLoadingMenu(false);
+      return false;
     } else {
       setMenuItems(data || []);
       if (data?.length) setActiveMenuGroup(current => data.some(m => getMenuGroup(m.category, m.name, m.menu_group) === current) ? current : getMenuGroup(data[0].category, data[0].name, data[0].menu_group));
@@ -773,6 +775,7 @@ const taggedPhotos = venuePhotos.filter(
   };
 
   const handleAddMenuItem = async () => {
+    if (!isOwner) return;
     if (!newMenuName.trim()) {
       alert("Ürün adı boş olamaz.");
       return;
@@ -806,6 +809,7 @@ const taggedPhotos = venuePhotos.filter(
   };
 
   const startEditMenuItem = (menuItem) => {
+    if (!isOwner) return;
     setEditingMenuId(menuItem.id);
     setEditMenuName(menuItem.name || '');
     setEditMenuPrice(menuItem.price != null ? String(menuItem.price) : '');
@@ -820,6 +824,7 @@ const taggedPhotos = venuePhotos.filter(
   };
 
   const handleSaveEditMenuItem = async () => {
+    if (!isOwner) return;
     if (!editMenuName.trim()) {
       alert('Ürün adı boş olamaz.');
       return;
@@ -851,6 +856,7 @@ const taggedPhotos = venuePhotos.filter(
   };
 
   const handleDeleteMenuItem = async (menuItemId) => {
+    if (!isOwner) return;
     try {
       const { error } = await supabase
         .from('menu_items')
@@ -1352,7 +1358,7 @@ const taggedPhotos = venuePhotos.filter(
             )}
           </View>
 
-          {isOwner && <MenuPhotoImport venueId={item.id} onImported={fetchMenuItems} />}
+          {isOwner && <MenuPhotoImport venueId={item.id} canManage={isOwner} onImported={fetchMenuItems} />}
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
             <Text style={{ fontSize: 19, fontWeight: 'bold', color: '#333' }}>Menü 🍽️</Text>
             {isOwner && (
