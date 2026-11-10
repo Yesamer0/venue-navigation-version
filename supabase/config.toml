@@ -428,3 +428,7 @@ entrypoint = "./functions/notify-venue-message/index.ts"
 [functions.cleanup-visitor-photos]
 # Authenticated with PHOTO_CLEANUP_TOKEN inside the function.
 verify_jwt = false
+
+[functions.import-menu]
+# User JWT is validated with auth.getUser inside the handler; RPCs enforce ownership.
+verify_jwt = false
