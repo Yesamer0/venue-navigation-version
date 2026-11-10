@@ -12,7 +12,6 @@ import {
   ScrollView,
   StyleSheet,
 } from 'react-native';
-import * as Location from 'expo-location';
 import { getFreshLocation } from './deviceLocation';
 import DemoCafeButton from './DemoCafeButton';
 import MapView, { Marker } from 'react-native-maps';
@@ -61,6 +60,8 @@ const calculateDistance = (lat1, lon1, lat2, lon2) => {
 export default function HomeScreen({ navigation }) {
   const [venues, setVenues] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const venuesRequestRef = useRef(0);
   const [selectedCategory, setSelectedCategory] = useState('Hepsi');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -84,6 +85,7 @@ export default function HomeScreen({ navigation }) {
   }, []));
 
   const fetchVenues = async () => {
+    const request = ++venuesRequestRef.current;
     try {
       setLoading(true);
 
@@ -93,11 +95,13 @@ export default function HomeScreen({ navigation }) {
 
       if (error) throw error;
 
+      if (request !== venuesRequestRef.current) return;
       setVenues(data || []);
+      setLoadError(false);
     } catch (error) {
-      console.log('Venue fetch error:', error);
+      if (request === venuesRequestRef.current) setLoadError(true);
     } finally {
-      setLoading(false);
+      if (request === venuesRequestRef.current) setLoading(false);
     }
   };
 
@@ -171,14 +175,6 @@ export default function HomeScreen({ navigation }) {
 
     try {
       setLoadingLocation(true);
-
-      const { status } =
-        await Location.requestForegroundPermissionsAsync();
-
-      if (status !== 'granted') {
-        alert('Yakınlığa göre sıralamak için konum izni vermelisin.');
-        return;
-      }
 
       const location = await getFreshLocation();
 
@@ -305,6 +301,17 @@ export default function HomeScreen({ navigation }) {
 
   const renderHeader = () => (
     <View>
+      {loadError && (
+        <View style={localStyles.emptyContainer} accessibilityLiveRegion="polite">
+          <Text style={localStyles.emptyTitle}>Mekânlar yüklenemedi</Text>
+          <Text style={localStyles.emptyDescription}>
+            Bağlantını kontrol edip yeniden dene.{venues.length > 0 ? ' Son yüklenen mekânlar gösteriliyor.' : ''}
+          </Text>
+          <TouchableOpacity accessibilityRole="button" disabled={loading} onPress={fetchVenues} style={localStyles.emptyResetButton}>
+            <Text style={localStyles.emptyResetText}>{loading ? 'Yükleniyor…' : 'Yeniden dene'}</Text>
+          </TouchableOpacity>
+        </View>
+      )}
       <View style={localStyles.header}>
         <Text style={localStyles.brand}>VENUE · MEKSO</Text>
         <Text style={localStyles.subtitle}>
@@ -610,7 +617,7 @@ export default function HomeScreen({ navigation }) {
     </TouchableOpacity>
   );
 
-  if (loading) {
+  if (loading && venues.length === 0 && !loadError) {
     return (
       <View style={localStyles.loadingContainer}>
         <ActivityIndicator size="large" color={COLORS.pink} />
@@ -634,7 +641,7 @@ export default function HomeScreen({ navigation }) {
         keyboardDismissMode="on-drag"
         showsVerticalScrollIndicator={false}
         contentContainerStyle={localStyles.listContent}
-        ListEmptyComponent={
+        ListEmptyComponent={loadError ? null :
           <View style={localStyles.emptyContainer}>
             <Text style={localStyles.emptyTitle}>
               Henüz mekân bulunamadı

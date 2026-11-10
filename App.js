@@ -12,6 +12,7 @@ import AuthScreen from './AuthScreen';
 import MainTabs from './MainTabs';
 import { AuthProvider, useAuth } from './AuthProvider';
 import { signOutVenue } from './authService';
+import { startPresenceTracking } from './presenceTracking';
 
 const Stack = createStackNavigator();
 
@@ -29,6 +30,9 @@ if (Platform.OS !== 'web') {
 
 function RootNavigator() {
   const { session, profile, loading, error, retry } = useAuth();
+  useEffect(() => {
+    if (session?.user?.id && profile) return startPresenceTracking(session.user.id);
+  }, [session?.user?.id, profile?.id]);
   if (loading) return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFF0F5' }}><ActivityIndicator color="#C2185B" /><Text style={{ marginTop: 12 }}>Hesabın hazırlanıyor…</Text></View>;
   if (error) return <View style={{ flex: 1, justifyContent: 'center', padding: 28, backgroundColor: '#FFF0F5' }}>
     <Text accessibilityRole="alert" style={{ color: '#9B1B4D', lineHeight: 23 }}>{error}</Text>

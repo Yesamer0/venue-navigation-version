@@ -9,11 +9,10 @@ import {
   TextInput, 
   ActivityIndicator, 
   Dimensions,
-  AppState,
   useWindowDimensions,
 } from 'react-native';
-import * as Location from 'expo-location';
 import { getFreshLocation } from './deviceLocation';
+import { refreshPresenceTracking } from './presenceTracking';
 import { supabase } from './supabase'; 
 import { styles } from './styles';
 import { useFocusEffect } from '@react-navigation/native';
@@ -28,7 +27,6 @@ let presenceSubscriptionSequence = 0;
 // Canlı durum için: bu süre içinde tazelenmemiş bir "buradayım" kaydı artık sayılmaz
 const PRESENCE_WINDOW_MINUTES = 30;
 const CHECK_IN_RADIUS = 100;   // Giriş mesafesi (metre)
-const CHECK_OUT_RADIUS = 150;  // Otomatik çıkış mesafesi (metre)
 
 const calculateDistance = (lat1, lon1, lat2, lon2) => {
   const R = 6371000; // Dünya yarıçapı (metre)
@@ -84,14 +82,7 @@ export default function DetailsScreen({ route, navigation }) {
   const [distanceToVenue, setDistanceToVenue] = useState(null);
   const [checkingLocation, setCheckingLocation] = useState(false);
   const [isCheckedIn, setIsCheckedIn] = useState(false);
-  const locationSubscriptionRef = useRef(null);
-  const locationTrackingActiveRef = useRef(false);
-  const lastRefreshRef = useRef(0);
-  const checkingOutRef = useRef(false);
-  const processingLocationRef = useRef(false);
-  const trackingGenerationRef = useRef(0);
   const checkInSubmittingRef = useRef(false);
-  const processLocationRef = useRef(null);
 
   
   // --- Yorum / Puanlama ---
@@ -332,16 +323,6 @@ await fetchCheckInStatus(authUser.id);
     }
   };
   // --- GPS tabanlı check-in / check-out ---
-  const stopLocationTracking = () => {
-    trackingGenerationRef.current += 1;
-    locationTrackingActiveRef.current = false;
-    processLocationRef.current = null;
-    if (locationSubscriptionRef.current) {
-      locationSubscriptionRef.current.remove();
-      locationSubscriptionRef.current = null;
-    }
-  };
-
   const fetchCheckInStatus = async (userId) => {
     if (!userId) {
       setIsCheckedIn(false);
@@ -390,142 +371,9 @@ await fetchCheckInStatus(authUser.id);
     }
   };
 
-  const refreshCheckIn = async (userId) => {
-    if (!userId) return false;
-    try {
-      const { data, error } = await supabase
-        .from('venue_presence')
-        .update({ last_seen_at: new Date().toISOString() })
-        .eq('venue_id', item.id)
-        .eq('user_id', userId)
-        .select('user_id');
-      if (error) {
-        console.log('Check-in yenileme hatası:', error);
-        return false;
-      }
-      return Array.isArray(data) && data.length > 0;
-    } catch (error) {
-      console.log('Check-in yenileme bağlantı hatası:', error);
-      return false;
-    }
-  };
-
-  const handleCheckOut = async (userId) => {
-    if (checkingOutRef.current) return false;
-    checkingOutRef.current = true;
-    try {
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      if (authError || !user || user.id !== userId) return false;
-      const { error } = await supabase
-        .from('venue_presence')
-        .delete()
-        .eq('venue_id', item.id)
-        .eq('user_id', userId);
-      if (error) {
-        console.log('Check-out hatası:', error);
-        return false;
-      }
-      setIsCheckedIn(false);
-      lastRefreshRef.current = 0;
-      await fetchLiveCount();
-      console.log('Otomatik check-out başarılı.');
-      return true;
-    } catch (error) {
-      console.log('Check-out bağlantı hatası:', error);
-      return false;
-    } finally {
-      checkingOutRef.current = false;
-    }
-  };
-
-  const startLocationTracking = async (userId) => {
-    if (locationTrackingActiveRef.current || locationSubscriptionRef.current) return;
-    if (!userId) return;
-
-    const venueLat = Number(item.latitude);
-    const venueLon = Number(item.longitude);
-    if (
-      item.latitude == null || item.longitude == null ||
-      !Number.isFinite(venueLat) || !Number.isFinite(venueLon) ||
-      (venueLat === 0 && venueLon === 0)
-    ) return;
-
-    locationTrackingActiveRef.current = true;
-    const generation = ++trackingGenerationRef.current;
-    const isActive = () =>
-      locationTrackingActiveRef.current &&
-      trackingGenerationRef.current === generation;
-
-    const processLocation = async (location) => {
-      if (!isActive() || processingLocationRef.current) return;
-      const { latitude, longitude, accuracy } = location.coords;
-      if (accuracy == null || accuracy > 50) return;
-      processingLocationRef.current = true;
-      try {
-        if (!isActive()) return;
-        const distance = calculateDistance(latitude, longitude, venueLat, venueLon);
-        setDistanceToVenue(distance);
-        console.log('GPS mesafesi:', Math.round(distance), 'metre');
-
-        // GPS hata payını hesaba kat: sınırın gerçekten dışındaysa çıkış yap.
-        if (distance - accuracy > CHECK_OUT_RADIUS) {
-          const success = await handleCheckOut(userId);
-          if (success && isActive()) stopLocationTracking();
-          return;
-        }
-
-        // Yenileme sadece mekana güvenilir biçimde yakınken yapılır.
-        const now = Date.now();
-        if (
-          isActive() && !checkingOutRef.current &&
-          distance + accuracy <= CHECK_IN_RADIUS &&
-          now - lastRefreshRef.current >= 5 * 60 * 1000
-        ) {
-          const refreshed = await refreshCheckIn(userId);
-          if (refreshed && isActive()) lastRefreshRef.current = Date.now();
-          if (!refreshed && isActive()) {
-            // Kayıt silinmiş ya da zaman aşımına uğramış olabilir.
-            const stillCheckedIn = await fetchCheckInStatus(userId);
-            if (!stillCheckedIn && isActive()) stopLocationTracking();
-          }
-        }
-      } catch (error) {
-        console.log('GPS konum işleme hatası:', error);
-      } finally {
-        processingLocationRef.current = false;
-      }
-    };
-
-    processLocationRef.current = processLocation;
-    try {
-      const { status } = await Location.getForegroundPermissionsAsync();
-      if (status !== 'granted' || !isActive()) {
-        if (isActive()) stopLocationTracking();
-        return;
-      }
-      const subscription = await Location.watchPositionAsync(
-        { accuracy: Location.Accuracy.High, distanceInterval: 20 },
-        processLocation
-      );
-      if (!isActive()) {
-        subscription.remove();
-        return;
-      }
-      locationSubscriptionRef.current = subscription;
-    } catch (error) {
-      console.log('GPS takip hatası:', error);
-      if (isActive()) stopLocationTracking();
-    }
-  };
-
   const checkVenueDistance = async () => {
     setCheckingLocation(true);
     try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        alert('Konum izni vermelisiniz.');
-        return null;
-      }
       const venueLat = Number(item.latitude);
       const venueLon = Number(item.longitude);
       if (
@@ -580,9 +428,8 @@ await fetchCheckInStatus(authUser.id);
         return;
       }
       setIsCheckedIn(true);
-      lastRefreshRef.current = Date.now();
+      refreshPresenceTracking();
       await fetchLiveCount();
-      await startLocationTracking(currentUser.id);
       alert('Check-in başarılı! Mekandasınız.');
     } catch (error) {
       console.log('Check-in hatası:', error);
@@ -592,80 +439,19 @@ await fetchCheckInStatus(authUser.id);
     }
   };
 
-  // Detay ekranı odaktayken sayımı ve konum takibini sürdür.
-  useFocusEffect(
-    useCallback(() => {
-      let active = true;
-      let timer = null;
-      let heartbeat = null;
-
-      const resumeTracking = async () => {
-        try {
-          const { data: { user }, error } = await supabase.auth.getUser();
-          if (error || !active) return;
-          if (!user) {
-            setIsCheckedIn(false);
-            stopLocationTracking();
-            return;
-          }
-          const cutoff = new Date(
-            Date.now() - PRESENCE_WINDOW_MINUTES * 60 * 1000
-          ).toISOString();
-          const { data, error: presenceError } = await supabase
-            .from('venue_presence')
-            .select('user_id')
-            .eq('venue_id', item.id)
-            .eq('user_id', user.id)
-            .gte('last_seen_at', cutoff)
-            .maybeSingle();
-          if (!active || presenceError) return;
-          setIsCheckedIn(Boolean(data));
-          if (data && AppState.currentState === 'active') {
-            await startLocationTracking(user.id);
-          }
-          else stopLocationTracking();
-          if (!active) stopLocationTracking();
-        } catch (error) {
-          console.log('GPS yeniden başlatma hatası:', error);
-        }
-      };
-
-      fetchLiveCount();
-      resumeTracking();
-      const appStateSubscription = AppState.addEventListener('change', (state) => {
-        if (!active) return;
-        if (state === 'active') resumeTracking();
-        else stopLocationTracking();
-      });
-      timer = setInterval(() => {
-        if (active) fetchLiveCount();
-      }, 60 * 1000);
-
-      // Telefon hareketsizken de 5 dakikada bir taze GPS konumu doğrula.
-      heartbeat = setInterval(async () => {
-        if (!active || !locationTrackingActiveRef.current ||
-            !processLocationRef.current || processingLocationRef.current) return;
-        try {
-          const position = await Location.getCurrentPositionAsync({
-            accuracy: Location.Accuracy.High,
-          });
-          if (active && processLocationRef.current) {
-            await processLocationRef.current(position);
-          }
-        } catch (error) {
-          console.log('GPS periyodik kontrol hatası:', error);
-        }
-      }, 5 * 60 * 1000);
-
-      return () => {
-        active = false;
-        clearInterval(timer);
-        clearInterval(heartbeat);
-        appStateSubscription.remove();
-        stopLocationTracking();
-      };
-    }, [item.id])
-  );
+  // Navigation only refreshes presentation; the root owns foreground GPS tracking.
+  useFocusEffect(useCallback(() => {
+    let active = true;
+    const refresh = async () => {
+      if (!active) return;
+      await fetchLiveCount();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (active && user) await fetchCheckInStatus(user.id);
+    };
+    void refresh().catch(() => {});
+    const timer = setInterval(() => { void refresh().catch(() => {}); }, 30000);
+    return () => { active = false; clearInterval(timer); };
+  }, [item.id]));
 
   const fetchMenuItems = async () => {
     setLoadingMenu(true);
