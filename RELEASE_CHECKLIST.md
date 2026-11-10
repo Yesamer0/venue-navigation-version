@@ -53,3 +53,5 @@ iOS export başarılı (1271 modül). Son eklenen otomatik doldurma props'ları 
 ## Yardımcılar ve güvenlik
 
 Çalışma dizinindeki venue_supabase_api.py mevcut Windows Supabase CLI credential'ını yalnızca bellekte kullanır; token yazdırmaz. github_api.py Git Credential Manager üzerinden GitHub doğrulaması yapar. verify_live_auth.py ve verify_live_* dosyaları geçici test hesapları kullanır ve temizler; mevcut kullanıcıları veya gerçek fotoğrafları test için silme. Supabase CLI C:\venue-app\node_modules\.bin\supabase.cmd. Ağ/DNS yüzünden Expo tüneli ara sıra kapanabilir; yeni QR verirken gerçek çalışan adresi logdan/manifestten doğrula.
+
+Verified auth implementation commit: 5cc2e69e40c49a4160e78de3fc1e25bb56c604db on origin/main. Later handoff-only formatting/documentation commits may follow; do not reset the working tree to the implementation commit.
