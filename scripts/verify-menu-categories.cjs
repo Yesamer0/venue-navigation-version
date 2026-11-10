@@ -10,6 +10,8 @@ vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(root,'menuGroupi
  const db=new PGlite();
  await db.exec(`create table menu_items(id serial primary key,venue_id int,name text,price numeric,category text,created_at timestamptz default now());insert into menu_items(venue_id,name,price,category) values(1,'Latte',155,'SICAK İÇECEKLER'),(1,'Çay',25,'Sıcak İçecekler');`);
  await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261110143000_normalize_menu_categories.sql'),'utf8'));
+ await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261110143500_turkish_category_casefold.sql'),'utf8'));
+ assert.equal((await db.query("select menu_category_key('SICAK İÇECEKLER') as key")).rows[0].key,'sicak icecekler');
  assert.equal((await db.query('select distinct category from menu_items')).rows.length,1);
  await db.query("insert into menu_items(venue_id,name,price,category) values(1,'Espresso',65,'sicak  icecekler')");
  await db.query("update menu_items set category=' SICAK İÇECEKLER ' where name='Çay'");
