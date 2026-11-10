@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import * as Location from 'expo-location';
+import { getFreshLocation } from './deviceLocation';
 import { supabase } from './supabase';
 
 // Varsayılan harita merkezi: Köyceğiz, Muğla
@@ -137,7 +138,7 @@ export default function AddVenueScreen({ navigation }) {
         alert('Konumunuzu kullanabilmek için izin vermelisiniz.');
         return;
       }
-      const loc = await Location.getCurrentPositionAsync({});
+      const loc = await getFreshLocation();
       const { latitude, longitude } = loc.coords;
 
       setSelectedLat(latitude);

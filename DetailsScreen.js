@@ -13,6 +13,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import * as Location from 'expo-location';
+import { getFreshLocation } from './deviceLocation';
 import { supabase } from './supabase'; 
 import { styles } from './styles';
 import { useFocusEffect } from '@react-navigation/native';
@@ -536,9 +537,7 @@ await fetchCheckInStatus(authUser.id);
         alert('Mekanın koordinatları geçersiz.');
         return null;
       }
-      const location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High,
-      });
+      const location = await getFreshLocation();
       const { latitude, longitude, accuracy } = location.coords;
       if (accuracy == null || accuracy > 50) {
         alert('GPS doğruluğu yetersiz. Açık alanda tekrar deneyin.');

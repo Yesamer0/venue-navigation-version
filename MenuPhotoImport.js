@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { supabase } from './supabase';
 import { decodePhoto } from './momentApi';
 
@@ -14,17 +15,23 @@ export default function MenuPhotoImport({ venueId, onImported }) {
       if (camera && !(await ImagePicker.requestCameraPermissionsAsync()).granted) {
         throw new Error('Kamera izni gerekiyor.');
       }
-      const options = { mediaTypes: ['images'], base64: true, quality: 0.9, exif: false, allowsEditing: false };
+      const options = { mediaTypes: ['images'], quality: 1, exif: false, allowsEditing: false };
       const result = camera ? await ImagePicker.launchCameraAsync(options) : await ImagePicker.launchImageLibraryAsync(options);
       if (result.canceled) return;
       const asset = result.assets[0];
-      const photo = decodePhoto(asset.base64);
+      if (!asset?.uri) throw new Error('Fotoğraf alınamadı. Yeniden dene.');
+      const longest = Math.max(asset.width || 0, asset.height || 0);
+      const actions = longest > 2400 ? [{ resize: asset.width >= asset.height ? { width: 2400 } : { height: 2400 } }] : [];
+      const prepared = await manipulateAsync(asset.uri, actions, { format: SaveFormat.JPEG, compress: 0.85, base64: true });
+      const photo = decodePhoto(prepared.base64);
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !sessionData.session) throw new Error('Menü eklemek için yeniden giriş yap.');
       const { data, error } = await supabase.functions.invoke('import-menu', {
-        body: { venueId: String(venueId), image: asset.base64, mimeType: photo.contentType },
+        body: { venueId: String(venueId), image: prepared.base64, mimeType: photo.contentType },
       });
       if (error || data?.error) {
         let message = data?.error;
-        try { message = message || (await error?.context?.json())?.error; } catch (_) {}
+        try { const details = await error?.context?.json(); message = message || details?.error || (details?.message === 'Invalid JWT' ? 'Oturum doğrulanamadı. Yeniden giriş yap.' : null); } catch (_) {}
         throw new Error(message || 'Menü okunamadı. Aynı fotoğrafla yeniden deneyebilirsin.');
       }
       await onImported();

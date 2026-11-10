@@ -30,3 +30,13 @@ PostgreSQL-engine tests covered ownership, idempotency, Storage RLS, maximum thr
 The latest UI decision removes the duplicate photo feed from personal/management screens; venue photos are displayed on the public venue page. The earlier profile-hidden database support remains but is not exposed through that removed feed.
 
 Legacy gallery entries are preserved. Pinning applies to the new venue-account photo records. Photo feeds currently load at most 300 venue photos. Public Storage image links remain readable until their files are removed.
+
+
+## Menu camera and single demo cafe — 2026-11-10
+
+- Home has a button that creates a cafe named `deneme` for the signed-in user at a fresh phone GPS fix (<=50m accuracy, <=60s old). It reuses that user's existing `deneme` cafe and updates coordinates; it never changes other cafes. GPS consent is requested on the device. Check-in remains the normal distance-checked action on the cafe detail page.
+- Camera and gallery photos are converted to JPEG, resized to a maximum 2400px edge and compressed before the existing menu importer. This also handles formats such as HEIC through the native image decoder. The original photo remains on the device.
+- Map recenter, nearby sorting, cafe location selection and check-in request a fresh, accurate location.
+- Verification: `node scripts/verify-menu-demo.cjs` covers GPS rejection, cafe reuse and camera/gallery conversion/invocation with mocks. JS/JSX syntax passes; Android export passed (1254 modules). Real phone OCR and check-in still need device verification.
+- Live `import-menu` version 5 has legacy gateway `verify_jwt=true`. Its handler already authenticates with `auth.getUser()` and its SQL RPCs require venue ownership. Proposed config change to disable the incompatible legacy gateway is pending explicit user approval after automatic review rejected deployment. It has NOT been deployed.
+- The cafe row is created only after pressing the button on the phone, since this workspace cannot know the user's current GPS coordinates or signed-in app session. No location was fabricated.

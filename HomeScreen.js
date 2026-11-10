@@ -13,6 +13,8 @@ import {
   StyleSheet,
 } from 'react-native';
 import * as Location from 'expo-location';
+import { getFreshLocation } from './deviceLocation';
+import DemoCafeButton from './DemoCafeButton';
 import MapView, { Marker } from 'react-native-maps';
 import { supabase } from './supabase';
 import { useFocusEffect } from '@react-navigation/native';
@@ -143,27 +145,9 @@ export default function HomeScreen({ navigation }) {
 
   const goToMyLocation = async () => {
     try {
-      let location = userLocation;
-
-      if (!location) {
-        const { status } =
-          await Location.requestForegroundPermissionsAsync();
-
-        if (status !== 'granted') {
-          alert('Konumunu göstermek için konum izni vermelisin.');
-          return;
-        }
-
-        const currentLocation =
-          await Location.getCurrentPositionAsync({});
-
-        location = {
-          latitude: currentLocation.coords.latitude,
-          longitude: currentLocation.coords.longitude,
-        };
-
-        setUserLocation(location);
-      }
+      const position = await getFreshLocation();
+      const location = { latitude: position.coords.latitude, longitude: position.coords.longitude };
+      setUserLocation(location);
 
       mapRef.current?.animateToRegion(
         {
@@ -196,7 +180,7 @@ export default function HomeScreen({ navigation }) {
         return;
       }
 
-      const location = await Location.getCurrentPositionAsync({});
+      const location = await getFreshLocation();
 
       setUserLocation({
         latitude: location.coords.latitude,
@@ -328,6 +312,7 @@ export default function HomeScreen({ navigation }) {
         </Text>
       </View>
 
+      <DemoCafeButton navigation={navigation} />
       <View style={localStyles.searchSection}>
         <View style={localStyles.searchBar}>
           <Text style={localStyles.searchIcon}>⌕</Text>
