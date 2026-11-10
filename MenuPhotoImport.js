@@ -53,14 +53,14 @@ export default function MenuPhotoImport({ venueId, canManage = false, onImported
       try { if (await onImported() === false) throw new Error('refresh'); }
       catch (_) { setPhoto(null); setStatus(`${data.count} ürün kaydedildi. Liste yenilenemedi; sayfayı tekrar aç.`); return; }
       setPhoto(null);
-      setStatus(data.alreadyImported ? `${data.count} ürün bu fotoğraftan zaten eklenmiş. Menü yenilendi.` : `${data.count} ürün menüye eklendi. İsim ve fiyatları aşağıdan kontrol edebilirsin.`);
+      setStatus(data.alreadyImported ? `${data.count} ürün bu fotoğraftan zaten eklenmiş. Menü yenilendi.` : `${data.count} ürün işlendi. Yeni ürünler eklendi; mevcut ürünlerin okunan fiyatları güncellendi.`);
     } catch (cause) { setError(cause.message || 'Menü kaydedilemedi.'); setStatus(''); }
     finally { lock.current = false; setBusy(false); }
   };
   if (!canManage) return null;
   return <View style={styles.card}>
     <Text style={styles.title}>Fotoğraftan menü ekle</Text>
-    <Text style={styles.help}>Menünün tamamı net ve düz görünsün. Fotoğraf yapay zekâyla ürün, kategori ve fiyatlara dönüştürülür; fotoğraf galeriye eklenmez.</Text>
+    <Text style={styles.help}>Menünün tamamı net ve düz görünsün. Fotoğraf yapay zekâyla ürün, kategori ve fiyatlara dönüştürülür; yeni ürünler eklenir, mevcut ürünlerin okunabilen fiyatları güncellenir. Fotoğraf galeriye eklenmez.</Text>
     {photo && <Image accessibilityLabel="Seçilen menü fotoğrafı" source={{ uri: photo.uri }} style={styles.preview} resizeMode="contain" />}
     {!!status && <Text accessibilityLiveRegion="polite" style={styles.status}>{status}</Text>}
     {!!error && <View accessibilityRole="alert" style={styles.error}><Text style={styles.errorText}>{error}</Text><Text style={styles.help}>Yeniden deneyebilir veya başka bir fotoğraf seçebilirsin.</Text></View>}

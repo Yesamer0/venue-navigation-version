@@ -42,3 +42,10 @@ Legacy gallery entries are preserved. Pinning applies to the new venue-account p
 - Run `node scripts/verify-menu-demo.cjs`, `node scripts/verify-menu-edge.cjs`, and `node scripts/verify-menu-permissions.cjs` after `npm ci`. They test UI preview/retry and traveler hiding, server fallback/failure behavior, and actual PostgreSQL RLS/role/idempotency rules. Live fixture validation supplements these tests.
 
 Validation completed: iOS export passed (1256 modules); all three verification scripts passed. The earlier traveler-owned duplicate `deneme` cafe contained no menu, photos, reviews, favorites, messages, campaigns or collections. It was removed together with its temporary presence/failed imports under a transaction that aborts if real content exists. Exactly one `deneme` cafe remains, owned by the business account. No other cafes were changed.
+
+
+## Reconcile later menu photos — 2026-11-10
+
+New menu photos now update matching product prices and insert only unseen products. Matching uses the full product name normalized for Unicode, letter case, Turkish i variants and repeated spaces; sizes/variants remain distinct names. Category headings do not determine identity. Missing/unreadable prices never erase known prices. Products absent from a page remain. Repeated lines on one page collapse; conflicting prices for the same full name reject the entire page rather than guessing. Venue locking serializes separate pages. Replaying an already processed image returns its original result without rolling back newer prices. Role/owner requirements remain unchanged. Existing historical duplicates are not deleted.
+
+Live two-photo validation passed: the second page updated Cay 40→55 and Latte 120→140, inserted Espresso 90, preserved Cheesecake 180 absent from the page, and kept four total products. Replaying the first photo did not roll prices back. Temporary test accounts/cafe were cleaned. Migration 20261110110000 is recorded in the linked project.
