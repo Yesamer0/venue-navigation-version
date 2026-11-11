@@ -12,6 +12,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { getFreshLocation } from './deviceLocation';
+import { hasPhotoTestAccess } from './photoTestAccess';
 import { refreshPresenceTracking } from './presenceTracking';
 import { supabase } from './supabase'; 
 import { styles } from './styles';
@@ -410,7 +411,8 @@ await fetchCheckInStatus(authUser.id);
     if (checkInSubmittingRef.current || checkingLocation || isCheckedIn) return;
     checkInSubmittingRef.current = true;
     try {
-      const position = await checkVenueDistance();
+      const testAccess = await hasPhotoTestAccess(item.id);
+      const position = testAccess ? { distance: 0, accuracy: 0 } : await checkVenueDistance();
       if (!position) return;
       if (position.distance + position.accuracy > CHECK_IN_RADIUS) {
         alert(`Mekana yaklaşık ${Math.round(position.distance)} metre uzaktasınız. ` +
@@ -430,7 +432,7 @@ await fetchCheckInStatus(authUser.id);
       setIsCheckedIn(true);
       refreshPresenceTracking();
       await fetchLiveCount();
-      alert('Check-in başarılı! Mekandasınız.');
+      alert(testAccess ? 'Süreli test check-in tamam. Fotoğraf paylaşabilirsin.' : 'Check-in başarılı! Mekandasınız.');
     } catch (error) {
       console.log('Check-in hatası:', error);
       alert('Bir bağlantı sorunu oluştu.');

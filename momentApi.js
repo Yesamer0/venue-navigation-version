@@ -1,4 +1,5 @@
-import * as Location from 'expo-location';
+import { getFreshLocation } from './deviceLocation';
+import { hasPhotoTestAccess } from './photoTestAccess';
 import { supabase } from './supabase';
 
 export const PHOTO_BUCKET = 'venue-moments';
@@ -13,18 +14,17 @@ export function distanceMeters(a, b) {
 }
 
 export async function verifyVenueLocation(venue) {
-  if (venue.latitude == null || venue.longitude == null ||
-      !Number.isFinite(Number(venue.latitude)) || !Number.isFinite(Number(venue.longitude))) {
+  const testAccess = await hasPhotoTestAccess(venue.id);
+  if (!testAccess && (venue.latitude == null || venue.longitude == null ||
+      !Number.isFinite(Number(venue.latitude)) || !Number.isFinite(Number(venue.longitude)))) {
     throw new Error('Bu mekânın konumu henüz eklenmemiş.');
   }
-  const permission = await Location.requestForegroundPermissionsAsync();
-  if (permission.status !== 'granted') throw new Error('Fotoğraf paylaşmak için konum izni gerekiyor.');
-  const location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+  const location = await getFreshLocation();
   const { latitude, longitude, accuracy } = location.coords;
   if (!Number.isFinite(accuracy) || accuracy > 50 || Date.now() - location.timestamp > 60000) {
     throw new Error('Konum yeterince net değil. Biraz bekleyip yeniden dene.');
   }
-  if (distanceMeters({ latitude, longitude }, {
+  if (!testAccess && distanceMeters({ latitude, longitude }, {
     latitude: Number(venue.latitude), longitude: Number(venue.longitude),
   }) + accuracy > 100) throw new Error('Fotoğraf paylaşmak için mekânın 100 metre yakınında olmalısın.');
   return { latitude, longitude, accuracy, capturedAt: new Date(location.timestamp).toISOString() };
