@@ -50,3 +50,6 @@ Foreground presence readiness: user confirmed automatic checkout on leaving with
 
 
 11 Kasım iPhone testi: kullanıcı giriş ve uygulamayı tamamen kapatıp açınca oturumun korunduğunu doğruladı (1–2 geçti). Çıkışta canlı venue_presence tablosunda authenticated DELETE grant eksikliği bulundu; self-only DELETE RLS zaten mevcuttu. Migration 20261111090000 yalnızca eksik DELETE yetkisini ekler; canlıya uygulandı ve migration geçmişinde. verify-presence-permissions testi eksik grant hatasını yeniden üretir ve başka kullanıcının kaydının korunmasını doğrular. Geçici iki hesapla gerçek JWT testi: kendi check-in silme, başkasını silememe ve local logout geçti. Test verileri temizlendi. Kullanıcının iPhone çıkış tekrarı henüz bekliyor.
+
+
+11 Kasım iPhone test 4: kullanıcı hesap/rol geçişinin çalıştığını doğruladı. Test 5 yanlış harita konumu bildirdi. HomeScreen FlatList başlığı her renderda yeni component function olarak verildiği için MapView yeniden mount olup sabit Muğla initialRegion değerine dönebiliyordu. Başlık artık React element olarak verilir; harita state değişimlerinde korunur. Yeniden açıldığında son GPS konumu initialRegion olarak kullanılır. Telefon konumu ayrı mavi marker ve GPS doğruluk çemberiyle gösterilir; Konumum düğmesi yükleme/çift basma korumalıdır. Gerçek iPhone konum tekrarı bekliyor.

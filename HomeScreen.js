@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { getFreshLocation } from './deviceLocation';
 import DemoCafeButton from './DemoCafeButton';
-import MapView, { Marker } from 'react-native-maps';
+import MapView, { Marker, Circle } from 'react-native-maps';
 import { supabase } from './supabase';
 import { useFocusEffect } from '@react-navigation/native';
 import { styles } from './styles';
@@ -73,6 +73,8 @@ export default function HomeScreen({ navigation }) {
   const [venueRatings, setVenueRatings] = useState({});
   const [userLocation, setUserLocation] = useState(null);
   const [loadingLocation, setLoadingLocation] = useState(false);
+  const [locatingMap, setLocatingMap] = useState(false);
+  const locatingMapRef = useRef(false);
 
   const [mapSizeIndex, setMapSizeIndex] = useState(1);
   const [mapVisible, setMapVisible] = useState(true);
@@ -148,22 +150,28 @@ export default function HomeScreen({ navigation }) {
   };
 
   const goToMyLocation = async () => {
+    if (locatingMapRef.current) return;
+    locatingMapRef.current = true;
+    setLocatingMap(true);
     try {
       const position = await getFreshLocation();
-      const location = { latitude: position.coords.latitude, longitude: position.coords.longitude };
+      const location = { latitude: position.coords.latitude, longitude: position.coords.longitude, accuracy: position.coords.accuracy };
       setUserLocation(location);
 
       mapRef.current?.animateToRegion(
         {
           latitude: location.latitude,
           longitude: location.longitude,
-          latitudeDelta: 0.01,
-          longitudeDelta: 0.01,
+          latitudeDelta: 0.004,
+          longitudeDelta: 0.004,
         },
         1000
       );
     } catch (error) {
       alert('Konum alınamadı: ' + error.message);
+    } finally {
+      locatingMapRef.current = false;
+      setLocatingMap(false);
     }
   };
 
@@ -181,6 +189,7 @@ export default function HomeScreen({ navigation }) {
       setUserLocation({
         latitude: location.coords.latitude,
         longitude: location.coords.longitude,
+        accuracy: location.coords.accuracy,
       });
 
       setSortMode('distance');
@@ -529,12 +538,16 @@ export default function HomeScreen({ navigation }) {
                 ref={mapRef}
                 style={{ width: '100%', height: '100%' }}
                 initialRegion={{
-                  latitude: 37.2153,
-                  longitude: 28.3636,
-                  latitudeDelta: 0.05,
-                  longitudeDelta: 0.05,
+                  latitude: userLocation?.latitude ?? 37.2153,
+                  longitude: userLocation?.longitude ?? 28.3636,
+                  latitudeDelta: userLocation ? 0.004 : 0.05,
+                  longitudeDelta: userLocation ? 0.004 : 0.05,
                 }}
               >
+                {userLocation && <>
+                  <Circle center={userLocation} radius={userLocation.accuracy} strokeColor="#2563EB" fillColor="rgba(37, 99, 235, 0.12)" />
+                  <Marker coordinate={userLocation} pinColor="#2563EB" title="Konumun" description={`Son GPS ölçümü · yaklaşık ±${Math.ceil(userLocation.accuracy)} m`} zIndex={10} />
+                </>}
                 {mapVenues.map((venue) => (
                   <Marker
                     key={venue.id}
@@ -553,10 +566,13 @@ export default function HomeScreen({ navigation }) {
 
               <TouchableOpacity
                 onPress={goToMyLocation}
+                disabled={locatingMap}
+                accessibilityRole="button"
+                accessibilityLabel="Haritayı güncel konumuma götür"
                 style={localStyles.locationButton}
               >
                 <Text style={localStyles.locationButtonText}>
-                  📍 Konumum
+                  {locatingMap ? 'Konum alınıyor…' : '📍 Konumum'}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -636,7 +652,7 @@ export default function HomeScreen({ navigation }) {
         data={filteredVenues}
         keyExtractor={(item) => item.id.toString()}
         renderItem={renderVenue}
-        ListHeaderComponent={renderHeader}
+        ListHeaderComponent={renderHeader()}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
         showsVerticalScrollIndicator={false}
