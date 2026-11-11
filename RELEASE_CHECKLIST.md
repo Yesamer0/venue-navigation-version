@@ -58,3 +58,6 @@ Verified auth implementation commit: 5cc2e69e40c49a4160e78de3fc1e25bb56c604db on
 
 
 10 Kasım devam doğrulaması: verify-device-location, verify-home-loading, verify-presence-tracking ve mevcut auth-state/menu-demo/photo-ui kontrolleri geçti. iPhone kapat/aç sorusuna kullanıcı “Henüz denemedim” yanıtını verdi; cihaz doğrulaması bekliyor. Menü değişiklik önizlemesi ve 2–6 başlıklarının kalan işleri henüz tamamlanmadı.
+
+
+11 Kasım iPhone testi: kullanıcı giriş ve uygulamayı tamamen kapatıp açınca oturumun korunduğunu doğruladı (1–2 geçti). Çıkışta canlı venue_presence tablosunda authenticated DELETE grant eksikliği bulundu; self-only DELETE RLS zaten mevcuttu. Migration 20261111090000 yalnızca eksik DELETE yetkisini ekler; canlıya uygulandı ve migration geçmişinde. verify-presence-permissions testi eksik grant hatasını yeniden üretir ve başka kullanıcının kaydının korunmasını doğrular. Geçici iki hesapla gerçek JWT testi: kendi check-in silme, başkasını silememe ve local logout geçti. Test verileri temizlendi. Kullanıcının iPhone çıkış tekrarı henüz bekliyor.

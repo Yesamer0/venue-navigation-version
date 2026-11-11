@@ -1,0 +1,23 @@
+const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
+const {PGlite}=require('@electric-sql/pglite');
+(async()=>{
+ const db=new PGlite();
+ await db.exec(`create role authenticated;create schema auth;
+ create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
+ grant usage on schema auth to authenticated;
+ create table public.venue_presence(venue_id text,user_id uuid);
+ alter table public.venue_presence enable row level security;
+ grant select,insert,update on public.venue_presence to authenticated;
+ create policy read_presence on public.venue_presence for select to authenticated using(true);
+ create policy own_delete on public.venue_presence for delete to authenticated using(auth.uid()=user_id);
+ insert into public.venue_presence values('fixture','11111111-1111-4111-8111-111111111111'),('fixture','22222222-2222-4222-8222-222222222222');
+ set request.jwt.claim.sub='11111111-1111-4111-8111-111111111111';set role authenticated;`);
+ await assert.rejects(()=>db.query('delete from public.venue_presence'),/permission denied/);
+ await db.exec('reset role');
+ await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/migrations/20261111090000_presence_delete_privilege.sql'),'utf8'));
+ await db.exec('set role authenticated');
+ assert.equal((await db.query("delete from public.venue_presence where user_id='22222222-2222-4222-8222-222222222222' returning *")).rows.length,0);
+ assert.equal((await db.query('delete from public.venue_presence returning *')).rows.length,1);
+ assert.equal((await db.query('select * from public.venue_presence')).rows.length,1);
+ await db.close();console.log('PASS: reproduces missing DELETE grant; own check-in deletion works; foreign row stays protected even for unfiltered deletion');
+})().catch(e=>{console.error(e);process.exitCode=1});
