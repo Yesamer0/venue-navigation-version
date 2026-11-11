@@ -53,3 +53,6 @@ Foreground presence readiness: user confirmed automatic checkout on leaving with
 
 
 11 Kasım iPhone test 4: kullanıcı hesap/rol geçişinin çalıştığını doğruladı. Test 5 yanlış harita konumu bildirdi. HomeScreen FlatList başlığı her renderda yeni component function olarak verildiği için MapView yeniden mount olup sabit Muğla initialRegion değerine dönebiliyordu. Başlık artık React element olarak verilir; harita state değişimlerinde korunur. Yeniden açıldığında son GPS konumu initialRegion olarak kullanılır. Telefon konumu ayrı mavi marker ve GPS doğruluk çemberiyle gösterilir; Konumum düğmesi yükleme/çift basma korumalıdır. Gerçek iPhone konum tekrarı bekliyor.
+
+
+11 Kasım konum tekrarında kullanıcı Konum alınıyor yazdığını fakat mavi işaretin çıkmadığını bildirdi. Önceki Expo sürecinin DNS ENOTFOUND ile kapandığı doğrulandı; önceki düzeltmenin telefona ulaştığı varsayılamaz. Yeni temiz önbellekli tünel başlatıldı. Home haritası artık region state ile doğrudan kontrol edilir; GPS alınamadığında açıklama harita üstünde görünür. GPS 20sn sınırı permission/services dahil tüm isteği kapsar; permission/services takılma testleri de geçti. iOS export 1272 modül başarılı. Fiziksel iPhone konum kontrolü hâlâ BEKLİYOR.

@@ -9,21 +9,24 @@ export function isFreshAccurateLocation(position, now = Date.now()) {
 }
 
 export async function getFreshLocation() {
-  const { status } = await Location.requestForegroundPermissionsAsync();
-  if (status !== 'granted') throw new Error('Konum izni gerekiyor.');
-  if (!(await Location.hasServicesEnabledAsync())) throw new Error('Telefonunun konum hizmetlerini aç.');
   let timer;
   try {
-    const position = await Promise.race([
-      Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High }),
+    // Permission/service checks can also stall on a physical device.
+    return await Promise.race([
+      (async () => {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') throw new Error('Konum izni gerekiyor.');
+        if (!(await Location.hasServicesEnabledAsync())) throw new Error('Telefonunun konum hizmetlerini aç.');
+        const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+        if (!isFreshAccurateLocation(position)) {
+          throw new Error('GPS konumun henüz yeterince net değil. Açık alanda yeniden dene.');
+        }
+        return position;
+      })(),
       new Promise((_, reject) => {
-        timer = setTimeout(() => reject(new Error('Konum alınması uzun sürdü. Açık alanda yeniden dene.')), 20000);
+        timer = setTimeout(() => reject(new Error('Konum alınması uzun sürdü. Konum iznini kontrol edip açık alanda yeniden dene.')), 20000);
       }),
     ]);
-    if (!isFreshAccurateLocation(position)) {
-      throw new Error('GPS konumun henüz yeterince net değil. Açık alanda yeniden dene.');
-    }
-    return position;
   } finally {
     clearTimeout(timer);
   }

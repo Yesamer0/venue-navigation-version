@@ -76,10 +76,11 @@ export default function HomeScreen({ navigation }) {
   const [locatingMap, setLocatingMap] = useState(false);
   const locatingMapRef = useRef(false);
 
+  const [mapRegion, setMapRegion] = useState({ latitude: 37.2153, longitude: 28.3636, latitudeDelta: 0.05, longitudeDelta: 0.05 });
+  const [mapLocationError, setMapLocationError] = useState('');
   const [mapSizeIndex, setMapSizeIndex] = useState(1);
   const [mapVisible, setMapVisible] = useState(true);
 
-  const mapRef = useRef(null);
 
   useFocusEffect(useCallback(() => {
     fetchVenues();
@@ -153,22 +154,15 @@ export default function HomeScreen({ navigation }) {
     if (locatingMapRef.current) return;
     locatingMapRef.current = true;
     setLocatingMap(true);
+    setMapLocationError('');
     try {
       const position = await getFreshLocation();
       const location = { latitude: position.coords.latitude, longitude: position.coords.longitude, accuracy: position.coords.accuracy };
       setUserLocation(location);
 
-      mapRef.current?.animateToRegion(
-        {
-          latitude: location.latitude,
-          longitude: location.longitude,
-          latitudeDelta: 0.004,
-          longitudeDelta: 0.004,
-        },
-        1000
-      );
+      setMapRegion({ latitude: location.latitude, longitude: location.longitude, latitudeDelta: 0.004, longitudeDelta: 0.004 });
     } catch (error) {
-      alert('Konum alınamadı: ' + error.message);
+      setMapLocationError(error.message || 'Konum alınamadı. Yeniden dene.');
     } finally {
       locatingMapRef.current = false;
       setLocatingMap(false);
@@ -528,6 +522,9 @@ export default function HomeScreen({ navigation }) {
               </TouchableOpacity>
             </View>
 
+            <Text accessibilityLiveRegion="polite" style={{ color: COLORS.pinkDark, marginBottom: 8, lineHeight: 20 }}>
+              {locatingMap ? 'Telefonundan güncel konum alınıyor…' : mapLocationError || (userLocation ? `Mavi işaret son konumun · GPS hata payı yaklaşık ±${Math.ceil(userLocation.accuracy)} m` : 'Konumunu göstermek için Konumum düğmesine dokun.')}
+            </Text>
             <View
               style={[
                 localStyles.mapContainer,
@@ -535,14 +532,9 @@ export default function HomeScreen({ navigation }) {
               ]}
             >
               <MapView
-                ref={mapRef}
                 style={{ width: '100%', height: '100%' }}
-                initialRegion={{
-                  latitude: userLocation?.latitude ?? 37.2153,
-                  longitude: userLocation?.longitude ?? 28.3636,
-                  latitudeDelta: userLocation ? 0.004 : 0.05,
-                  longitudeDelta: userLocation ? 0.004 : 0.05,
-                }}
+                region={mapRegion}
+                onRegionChangeComplete={setMapRegion}
               >
                 {userLocation && <>
                   <Circle center={userLocation} radius={userLocation.accuracy} strokeColor="#2563EB" fillColor="rgba(37, 99, 235, 0.12)" />
