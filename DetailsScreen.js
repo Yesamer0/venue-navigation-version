@@ -18,6 +18,7 @@ import { supabase } from './supabase';
 import { styles } from './styles';
 import { useFocusEffect } from '@react-navigation/native';
 import VenueMoments from './VenueMoments';
+import MomentFeed from './MomentFeed';
 import MenuPhotoImport from './MenuPhotoImport';
 import VenueAccountPhotos from './VenueAccountPhotos';
 import { getMenuGroup, groupMenuCategories } from './menuGrouping';
@@ -1121,10 +1122,9 @@ const taggedPhotos = venuePhotos.filter(
       </ScrollView>
 
       {/* ===== İÇERİK ===== */}
-      {activeMainTab === 'photos' && <VenueMoments canPublish={!isVenueAccount} venue={item} isCheckedIn={isCheckedIn} navigation={navigation}
-        showFeed={activeMainTab === 'photos'} onShowPhotos={() => setActiveMainTab('photos')} />}
+      {activeMainTab === 'photos' && <MomentFeed venueId={item.id} navigation={navigation} layout="grid" />}
       {activeMainTab === 'photos' ? null : (activeMainTab === 'menu' || activeMainTab === 'accountphotos') ? (
-        <ScrollView ref={accountPager} keyboardShouldPersistTaps="handled" horizontal pagingEnabled directionalLockEnabled showsHorizontalScrollIndicator={false} contentOffset={{ x: activeMainTab === 'accountphotos' ? pageWidth : 0, y: 0 }} onMomentumScrollEnd={event => setActiveMainTab(Math.round(event.nativeEvent.contentOffset.x / pageWidth) === 0 ? 'menu' : 'accountphotos')}>
+        <ScrollView ref={accountPager} scrollEnabled={activeMainTab === 'menu'} keyboardShouldPersistTaps="handled" horizontal pagingEnabled directionalLockEnabled showsHorizontalScrollIndicator={false} contentOffset={{ x: activeMainTab === 'accountphotos' ? pageWidth : 0, y: 0 }} onMomentumScrollEnd={event => setActiveMainTab(Math.round(event.nativeEvent.contentOffset.x / pageWidth) === 0 ? 'menu' : 'accountphotos')}>
         <View style={{ width: pageWidth, paddingHorizontal: 20 }}>
 
           <View style={{ flexDirection: 'row', gap: 10, marginBottom: 15 }}>
@@ -1227,8 +1227,7 @@ const taggedPhotos = venuePhotos.filter(
 
         </View>
         <View style={{ width: pageWidth }}><VenueAccountPhotos venue={item} isOwner={isOwner} active={activeMainTab === 'accountphotos'} legacyPhotos={officialPhotos} onDeleteLegacy={handleDeletePhoto} />
-          {activeMainTab === 'accountphotos' && <VenueMoments venue={item} isCheckedIn={isCheckedIn} navigation={navigation}
-            canPublish={!isVenueAccount} showFeed onShowPhotos={() => setActiveMainTab('accountphotos')} />}
+          {activeMainTab === 'accountphotos' && <VenueMoments venue={item} isCheckedIn={isCheckedIn} navigation={navigation} canPublish={!isVenueAccount} showFeed feedLayout="gallery" onShowPhotos={() => setActiveMainTab('accountphotos')} />}
         </View>
         </ScrollView>
       ) : (

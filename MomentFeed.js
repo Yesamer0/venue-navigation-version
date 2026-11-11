@@ -1,12 +1,14 @@
 import React, { useCallback, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Modal, Platform, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from './supabase';
 import MomentComments from './MomentComments';
 import { friendlyError, PAGE_SIZE, PHOTO_BUCKET, photoUrl } from './momentApi';
 
-export default function MomentFeed({ venueId = null, userId = null, navigation, refreshKey = 0 }) {
+export default function MomentFeed({ venueId = null, userId = null, navigation, refreshKey = 0, layout = 'list' }) {
   const [posts, setPosts] = useState([]);
+  const [openedId, setOpenedId] = useState(null);
+  const [galleryWidth, setGalleryWidth] = useState(0);
   const [loading, setLoading] = useState(true);
   const [more, setMore] = useState(false);
   const [error, setError] = useState('');
@@ -72,21 +74,14 @@ export default function MomentFeed({ venueId = null, userId = null, navigation, 
     finally { busy.current.delete(post.id); setPending((p) => ({ ...p, [post.id]: false })); }
   };
 
-  return <View style={s.feed}>
-    <View style={s.row}>
-      <Text style={s.heading}>Paylaşılan fotoğraflar</Text>
-      <TouchableOpacity accessibilityRole="button" disabled={loading} onPress={() => load()}><Text style={s.link}>Yenile</Text></TouchableOpacity>
-    </View>
-    {error ? <View accessibilityRole="alert"><Text style={s.error}>{error}</Text><TouchableOpacity onPress={() => load()}><Text style={s.link}>Tekrar dene</Text></TouchableOpacity></View> : null}
-    {!loading && !error && !posts.length ? <Text style={s.muted}>Henüz fotoğraf paylaşılmamış.</Text> : null}
-    {posts.map((post) => <View key={post.id} style={s.card}>
+  const renderPost = post => <View key={post.id} style={s.card}>
       <View style={s.row}>
-        <TouchableOpacity accessibilityRole="button" accessibilityLabel={`${post.username} profilini aç`} onPress={() => navigation.navigate('PublicProfile', { userId: post.user_id })}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel={`${post.username} profilini aç`} onPress={() => { setOpenedId(null); navigation.navigate('PublicProfile', { userId: post.user_id }); }}>
           <Text style={s.username}>@{post.username || 'Gezgin'}</Text>
         </TouchableOpacity>
         <Text style={s.date}>{new Date(post.created_at).toLocaleDateString('tr-TR')}</Text>
       </View>
-      <TouchableOpacity onPress={() => navigation.navigate('MomentPhoto', { path: post.storage_path })} accessibilityRole="button" accessibilityLabel="Fotoğrafı büyüt">
+      <TouchableOpacity onPress={() => { setOpenedId(null); navigation.navigate('MomentPhoto', { path: post.storage_path }); }} accessibilityRole="button" accessibilityLabel="Fotoğrafı büyüt">
         <Image source={{ uri: photoUrl(post.storage_path) }} style={s.photo} resizeMode="cover" accessibilityLabel={post.caption || 'Mekân fotoğrafı'} />
       </TouchableOpacity>
       <Text style={s.venue}>📍 {post.venue_name}</Text>
@@ -100,13 +95,41 @@ export default function MomentFeed({ venueId = null, userId = null, navigation, 
         ])}><Text style={s.muted}>Fotoğrafımı sil</Text></TouchableOpacity> : null}
       </View>
       <MomentComments momentId={post.id} />
-    </View>)}
+    </View>;
+
+  const openedPost = posts.find(post => post.id === openedId);
+  return <View style={s.feed}>
+    <View style={s.row}>
+      <Text style={s.heading}>Paylaşılan fotoğraflar</Text>
+      <TouchableOpacity accessibilityRole="button" disabled={loading} onPress={() => load()}><Text style={s.link}>Yenile</Text></TouchableOpacity>
+    </View>
+    {error ? <View accessibilityRole="alert"><Text style={s.error}>{error}</Text><TouchableOpacity onPress={() => load()}><Text style={s.link}>Tekrar dene</Text></TouchableOpacity></View> : null}
+    {!loading && !error && !posts.length ? <Text style={s.muted}>Henüz fotoğraf paylaşılmamış.</Text> : null}
+    {layout === 'grid' ? <View style={s.grid}>
+      {posts.map(post => <TouchableOpacity key={post.id} style={s.tile} onPress={() => setOpenedId(post.id)} accessibilityRole="button" accessibilityLabel={`${post.username || 'Gezgin'} fotoğrafını aç`}>
+        <Image source={{ uri: photoUrl(post.storage_path) }} style={s.tilePhoto} resizeMode="cover" />
+      </TouchableOpacity>)}
+    </View> : layout === 'gallery' ? <View onLayout={event => setGalleryWidth(event.nativeEvent.layout.width)}>
+      {posts.length > 1 && <Text style={s.muted}>Diğer fotoğraflar için yana kaydır →</Text>}
+      {galleryWidth > 0 && <ScrollView horizontal pagingEnabled directionalLockEnabled nestedScrollEnabled showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+        {posts.map(post => <View key={post.id} style={{ width: galleryWidth }}>{renderPost(post)}</View>)}
+      </ScrollView>}
+    </View> : posts.map(renderPost)}
+    {openedPost && <Modal visible animationType="slide" onRequestClose={() => setOpenedId(null)}>
+      <SafeAreaView style={s.modal}><KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Fotoğraf detayını kapat" onPress={() => setOpenedId(null)} style={s.close}><Text style={s.link}>Kapat ✕</Text></TouchableOpacity>
+        <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" contentContainerStyle={{ padding: 16 }}>{renderPost(openedPost)}</ScrollView>
+      </KeyboardAvoidingView></SafeAreaView>
+    </Modal>}
     {loading ? <ActivityIndicator color="#C2185B" style={{ margin: 16 }} /> : null}
     {more && !loading ? <TouchableOpacity style={s.more} onPress={() => load(true)}><Text style={s.link}>Daha fazla göster</Text></TouchableOpacity> : null}
   </View>;
 }
 
 const s = StyleSheet.create({
+  grid: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -1 },
+  tile: { width: '33.333333%', padding: 1 }, tilePhoto: { width: '100%', aspectRatio: 1, backgroundColor: '#FFEAF2' },
+  modal: { flex: 1, backgroundColor: '#FFF9FC' }, close: { alignSelf: 'flex-end', paddingHorizontal: 20, minHeight: 44, justifyContent: 'center' },
   feed: { padding: 16 }, row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 12 },
   heading: { color: '#9B1B4D', fontSize: 17, fontWeight: '700', flexShrink: 1 }, link: { color: '#C2185B', fontWeight: '600', paddingVertical: 8 },
   muted: { color: '#777', paddingVertical: 8 }, error: { color: '#B42318', paddingVertical: 10 },
