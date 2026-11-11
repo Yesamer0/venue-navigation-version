@@ -1,0 +1,10 @@
+const {PGlite}=require('@electric-sql/pglite'),fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
+(async()=>{const db=new PGlite();const me='11111111-1111-4111-8111-111111111111',other='22222222-2222-4222-8222-222222222222';await db.exec(`create schema auth;create function auth.uid() returns uuid language sql stable as $$select current_setting('request.jwt.claim.sub')::uuid$$;create table users(id uuid,is_venue boolean);create table venues(id text,owner_id uuid);create table venue_account_photos(id uuid primary key,venue_id text,user_id uuid,pinned_at timestamptz);insert into users values('${me}',true),('${other}',true);insert into venues values('demo','${me}');set request.jwt.claim.sub='${me}';`);
+await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/migrations/20261111120000_owner_photo_pins.sql'),'utf8'));
+let ids=[];for(let i=0;i<4;i++)ids.push((await db.query("insert into venue_account_photos values(gen_random_uuid(),'demo',$1,null) returning id",[me])).rows[0].id);
+for(const id of ids.slice(0,3))await db.query('select set_account_photo_pinned($1,true)',[id]);
+await assert.rejects(()=>db.query('select set_account_photo_pinned($1,true)',[ids[3]]),/En fazla 3/);
+await db.query('select set_account_photo_pinned($1,false)',[ids[0]]);await db.query('select set_account_photo_pinned($1,true)',[ids[3]]);
+await db.exec(`set request.jwt.claim.sub='${other}'`);await assert.rejects(()=>db.query('select set_account_photo_pinned($1,false)',[ids[3]]),/kendi mekan/);
+await db.exec(`set request.jwt.claim.sub='${me}';update users set is_venue=false where id='${me}'`);await assert.rejects(()=>db.query('select set_account_photo_pinned($1,false)',[ids[3]]),/kendi mekan/);
+assert.equal((await db.query('select count(*)::int as n from venue_account_photos where pinned_at is not null')).rows[0].n,3);await db.close();console.log('PASS: max three pins; unpin/replacement; foreign author and traveler denied');})().catch(e=>{console.error(e);process.exitCode=1});

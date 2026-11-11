@@ -1122,7 +1122,7 @@ const taggedPhotos = venuePhotos.filter(
       </ScrollView>
 
       {/* ===== İÇERİK ===== */}
-      {activeMainTab === 'photos' && <MomentFeed venueId={item.id} navigation={navigation} layout="grid" />}
+      {activeMainTab === 'photos' && <MomentFeed venueId={item.id} navigation={navigation} layout="grid" isVenueOwner={isOwner} />}
       {activeMainTab === 'photos' ? null : (activeMainTab === 'menu' || activeMainTab === 'accountphotos') ? (
         <ScrollView ref={accountPager} scrollEnabled={activeMainTab === 'menu'} keyboardShouldPersistTaps="handled" horizontal pagingEnabled directionalLockEnabled showsHorizontalScrollIndicator={false} contentOffset={{ x: activeMainTab === 'accountphotos' ? pageWidth : 0, y: 0 }} onMomentumScrollEnd={event => setActiveMainTab(Math.round(event.nativeEvent.contentOffset.x / pageWidth) === 0 ? 'menu' : 'accountphotos')}>
         <View style={{ width: pageWidth, paddingHorizontal: 20 }}>

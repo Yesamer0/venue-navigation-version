@@ -5,7 +5,7 @@ import { supabase } from './supabase';
 import MomentComments from './MomentComments';
 import { friendlyError, PAGE_SIZE, PHOTO_BUCKET, photoUrl } from './momentApi';
 
-export default function MomentFeed({ venueId = null, userId = null, navigation, refreshKey = 0, layout = 'list' }) {
+export default function MomentFeed({ venueId = null, userId = null, navigation, refreshKey = 0, layout = 'list', isVenueOwner = false }) {
   const [posts, setPosts] = useState([]);
   const [openedId, setOpenedId] = useState(null);
   const [galleryWidth, setGalleryWidth] = useState(0);
@@ -25,18 +25,27 @@ export default function MomentFeed({ venueId = null, userId = null, navigation, 
     try {
       const { data, error: queryError } = await supabase.rpc('list_venue_moments', {
         p_venue_id: venueId == null ? null : String(venueId), p_user_id: userId,
-        p_offset: append ? posts.length : 0, p_limit: PAGE_SIZE,
+        p_offset: append ? posts.filter(p => p.kind !== 'account').length : 0, p_limit: PAGE_SIZE,
       });
       if (queryError) throw queryError;
+      let official = [];
+      if (venueId != null && layout === 'grid') {
+        const result = await supabase.from('venue_account_photos').select('id,user_id,storage_path,caption,created_at,pinned_at').eq('venue_id', String(venueId)).order('created_at', { ascending: false }).limit(300);
+        if (result.error) throw result.error;
+        official = (result.data || []).map(post => ({ ...post, kind: 'account', username: 'Mekân sahibi' }));
+      }
       if (version !== generation.current) return;
-      setPosts((previous) => append ? [...previous, ...(data || []).filter((p) => !previous.some((old) => old.id === p.id))] : data || []);
+      setPosts(previous => {
+        const visitors = append ? [...previous.filter(p => p.kind !== 'account'), ...(data || []).filter(p => !previous.some(old => old.id === p.id))] : data || [];
+        return [...official, ...visitors].sort((a, b) => Number(!!b.pinned_at) - Number(!!a.pinned_at) || new Date(b.created_at) - new Date(a.created_at));
+      });
       setMore((data || []).length === PAGE_SIZE);
     } catch (e) {
       if (version === generation.current) setError(friendlyError(e));
     } finally {
       if (version === generation.current) { setLoading(false); fetching.current = false; }
     }
-  }, [venueId, userId, posts.length]);
+  }, [venueId, userId, posts.length, layout]);
 
   const loadRef = useRef(load);
   loadRef.current = load;
@@ -74,18 +83,30 @@ export default function MomentFeed({ venueId = null, userId = null, navigation, 
     finally { busy.current.delete(post.id); setPending((p) => ({ ...p, [post.id]: false })); }
   };
 
-  const renderPost = post => <View key={post.id} style={s.card}>
+  const pin = async post => {
+    if (busy.current.has(post.id)) return;
+    busy.current.add(post.id);
+    try {
+      const { error } = await supabase.rpc('set_account_photo_pinned', { p_photo_id: post.id, p_pinned: !post.pinned_at });
+      if (error) throw error;
+      await load();
+    } catch (e) { Alert.alert('Sabitleme yapılamadı', friendlyError(e)); }
+    finally { busy.current.delete(post.id); }
+  };
+
+  const renderPost = post => <View key={post.id} style={[s.card, post.kind === 'account' && s.ownerCard]}>
       <View style={s.row}>
         <TouchableOpacity accessibilityRole="button" accessibilityLabel={`${post.username} profilini aç`} onPress={() => { setOpenedId(null); navigation.navigate('PublicProfile', { userId: post.user_id }); }}>
-          <Text style={s.username}>@{post.username || 'Gezgin'}</Text>
+          <Text style={[s.username, post.kind === 'account' && { color: '#2563EB' }]}>{post.kind === 'account' ? 'Mekân sahibi' : `@${post.username || 'Gezgin'}`}</Text>
         </TouchableOpacity>
         <Text style={s.date}>{new Date(post.created_at).toLocaleDateString('tr-TR')}</Text>
       </View>
-      <TouchableOpacity onPress={() => { setOpenedId(null); navigation.navigate('MomentPhoto', { path: post.storage_path }); }} accessibilityRole="button" accessibilityLabel="Fotoğrafı büyüt">
-        <Image source={{ uri: photoUrl(post.storage_path) }} style={s.photo} resizeMode="cover" accessibilityLabel={post.caption || 'Mekân fotoğrafı'} />
+      <TouchableOpacity onPress={() => { if (post.kind !== 'account') { setOpenedId(null); navigation.navigate('MomentPhoto', { path: post.storage_path }); } }} accessibilityRole="button" accessibilityLabel="Fotoğrafı büyüt">
+        <Image source={{ uri: post.kind === 'account' ? supabase.storage.from('venue-account').getPublicUrl(post.storage_path).data.publicUrl : photoUrl(post.storage_path) }} style={s.photo} resizeMode="cover" accessibilityLabel={post.caption || 'Mekân fotoğrafı'} />
       </TouchableOpacity>
-      <Text style={s.venue}>📍 {post.venue_name}</Text>
+      {post.venue_name ? <Text style={s.venue}>📍 {post.venue_name}</Text> : null}
       {post.caption ? <Text style={s.caption}>{post.caption}</Text> : null}
+      {post.kind === 'account' ? <View><Text style={s.ownerLabel}>{post.pinned_at ? '📌 Sabit · ' : ''}Mekân sahibinin paylaşımı</Text>{isVenueOwner && <TouchableOpacity accessibilityRole="button" onPress={() => pin(post)}><Text style={s.link}>{post.pinned_at ? 'Sabitlemeyi kaldır' : '📌 Sabitle (en fazla 3)'}</Text></TouchableOpacity>}</View> : <>
       <View style={s.row}>
         <TouchableOpacity disabled={pending[post.id]} onPress={() => like(post)} accessibilityRole="button" accessibilityState={{ selected: post.liked_by_me, disabled: !!pending[post.id] }} accessibilityLabel={post.liked_by_me ? 'Beğeniyi kaldır' : 'Fotoğrafı beğen'}>
           <Text style={s.like}>{post.liked_by_me ? '♥' : '♡'} {post.like_count} beğeni</Text>
@@ -95,6 +116,7 @@ export default function MomentFeed({ venueId = null, userId = null, navigation, 
         ])}><Text style={s.muted}>Fotoğrafımı sil</Text></TouchableOpacity> : null}
       </View>
       <MomentComments momentId={post.id} />
+      </>}
     </View>;
 
   const openedPost = posts.find(post => post.id === openedId);
@@ -106,8 +128,9 @@ export default function MomentFeed({ venueId = null, userId = null, navigation, 
     {error ? <View accessibilityRole="alert"><Text style={s.error}>{error}</Text><TouchableOpacity onPress={() => load()}><Text style={s.link}>Tekrar dene</Text></TouchableOpacity></View> : null}
     {!loading && !error && !posts.length ? <Text style={s.muted}>Henüz fotoğraf paylaşılmamış.</Text> : null}
     {layout === 'grid' ? <View style={s.grid}>
-      {posts.map(post => <TouchableOpacity key={post.id} style={s.tile} onPress={() => setOpenedId(post.id)} accessibilityRole="button" accessibilityLabel={`${post.username || 'Gezgin'} fotoğrafını aç`}>
-        <Image source={{ uri: photoUrl(post.storage_path) }} style={s.tilePhoto} resizeMode="cover" />
+      {posts.map(post => <TouchableOpacity key={post.id} style={[s.tile, post.kind === 'account' ? s.ownerTile : s.visitorTile]} onPress={() => setOpenedId(post.id)} accessibilityRole="button" accessibilityLabel={`${post.username || 'Gezgin'} fotoğrafını aç`}>
+        <Image source={{ uri: post.kind === 'account' ? supabase.storage.from('venue-account').getPublicUrl(post.storage_path).data.publicUrl : photoUrl(post.storage_path) }} style={s.tilePhoto} resizeMode="cover" />
+        {post.pinned_at && <Text style={s.pinBadge}>📌</Text>}
       </TouchableOpacity>)}
     </View> : layout === 'gallery' ? <View onLayout={event => setGalleryWidth(event.nativeEvent.layout.width)}>
       {posts.length > 1 && <Text style={s.muted}>Diğer fotoğraflar için yana kaydır →</Text>}
@@ -129,6 +152,8 @@ export default function MomentFeed({ venueId = null, userId = null, navigation, 
 const s = StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -1 },
   tile: { width: '33.333333%', padding: 1 }, tilePhoto: { width: '100%', aspectRatio: 1, backgroundColor: '#FFEAF2' },
+  ownerCard: { borderColor: '#2563EB', borderWidth: 2 }, ownerTile: { borderColor: '#2563EB', borderWidth: 2 }, visitorTile: { borderColor: '#E78CB2', borderWidth: 2 },
+  ownerLabel: { color: '#2563EB', fontWeight: '700', paddingVertical: 8 }, pinBadge: { position: 'absolute', top: 4, right: 4, backgroundColor: '#fff', borderRadius: 10, padding: 3 },
   modal: { flex: 1, backgroundColor: '#FFF9FC' }, close: { alignSelf: 'flex-end', paddingHorizontal: 20, minHeight: 44, justifyContent: 'center' },
   feed: { padding: 16 }, row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 12 },
   heading: { color: '#9B1B4D', fontSize: 17, fontWeight: '700', flexShrink: 1 }, link: { color: '#C2185B', fontWeight: '600', paddingVertical: 8 },

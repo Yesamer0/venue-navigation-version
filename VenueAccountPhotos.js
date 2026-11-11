@@ -91,7 +91,7 @@ export default function VenueAccountPhotos({ venue, isOwner, legacyPhotos = [], 
     <View onLayout={event => setGalleryWidth(event.nativeEvent.layout.width)}>
       {all.length > 1 && <Text style={{ color: '#777', marginBottom: 8 }}>Diğer fotoğraflar için yana kaydır →</Text>}
       {galleryWidth > 0 && <ScrollView horizontal pagingEnabled directionalLockEnabled nestedScrollEnabled showsHorizontalScrollIndicator={false}>
-      {all.map(photo => <View key={`${photo.legacy ? 'legacy' : 'new'}-${photo.id}`} style={{ width: galleryWidth, padding: 2 }}>
+      {all.map(photo => <View key={`${photo.legacy ? 'legacy' : 'new'}-${photo.id}`} style={{ width: galleryWidth, padding: 4, borderWidth: 2, borderColor: '#2563EB', borderRadius: 14 }}>
         <TouchableOpacity accessibilityLabel={photo.caption || 'Mekan fotoğrafını aç'} onPress={() => setOpened(photo)}><Image source={{ uri: photo.image_url }} style={{ width: '100%', aspectRatio: 1 }} />
           {!!photo.username && <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.65)', padding: 6 }}>
             <Text numberOfLines={1} style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>@{photo.username.replace(/^@/, '')}</Text>

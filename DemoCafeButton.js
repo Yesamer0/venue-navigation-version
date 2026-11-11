@@ -41,6 +41,6 @@ export default function DemoCafeButton({ navigation }) {
     <TouchableOpacity accessibilityRole="button" disabled={busy} onPress={open}>
       <Text style={{ color: '#9B1B4D', fontWeight: '700' }}>{busy ? 'Deneme kafesi açılıyor…' : '☕ deneme kafesini aç'}</Text>
     </TouchableOpacity>
-    <Text style={{ color: '#666', marginTop: 6 }}>Mekan hesabı kafeyi güncel konumunda hazırlar. Gezgin hesabı aynı kafeyi ziyaret eder ve check-in yapabilir.</Text>
+    <Text style={{ color: '#666', marginTop: 6 }}>Mekan hesabı kafeyi güncel konumunda hazırlar. Gezgin hesabı aynı kafeyi ziyaret eder ve check-in yapabilir. Ziyaretçilerde gezgin kareleri pembe, mekan paylaşımları mavidir; mekan sahibi en fazla 3 kendi fotoğrafını sabitler.</Text>
   </View>;
 }

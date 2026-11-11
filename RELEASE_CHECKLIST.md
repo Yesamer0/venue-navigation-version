@@ -73,3 +73,6 @@ Verified auth implementation commit: 5cc2e69e40c49a4160e78de3fc1e25bb56c604db on
 
 
 11 Kasım fotoğraf arayüzü: kullanıcının son tercihi Ziyaretçiler sekmesinden fotoğraf PAYLAŞILMAMASI. Tek gezgin paylaşım alanı Fotoğraflar sekmesinde; Ziyaretçiler aynı kalıcı kayıtları 3 sütunlu kare ızgarada gösterir. Kareye dokununca aynı fotoğraf ID’sinin yorum/beğeni/sahip-silme detayları modalda açılır. Fotoğraflar sekmesinde gezgin ve resmi mekan galerileri yatay sayfalı kaydırılır; iç galeriyle çakışmaması için Fotoğraflar açıkken dış menü/fotoğraf pager swipe kapalı, sekme düğmeleri aktiftir. Profilin mevcut akışı korunur. UI testi ızgara/doğru fotoğraf/ortak beğeni ve yorum/yatay galeri kontrollerini kapsar. iOS export geçti. Kullanıcı uzaklaşma ve yeniden check-in testini şu an yapamadığını, diğer denemelerin çalıştığını bildirdi; uzaklaşma/yeniden check-in hâlâ fiziksel cihazda BEKLİYOR. Yeni galeri düzeninin gerçek iPhone görünümü de tekrar kontrol edilmeli.
+
+
+11 Kasım sabitleme/renk: kullanıcının isteği en fazla 3 kendi mekan paylaşımını pinlemek. Resmi fotoğraflar Ziyaretçiler ızgarasına mavi çerçeveyle katılır, gezgin kareleri pembe kalır. Pinli resmi paylaşımlar üsttedir. Sahip/rol/yazar/sınır kontrolleri SQL ve UI testlerinde geçti, 20261111120000 canlıda. Deneme kafesi aynı akışı kullanır. Gerçek iPhone renk/sabitleme kontrolü henüz bekliyor.
