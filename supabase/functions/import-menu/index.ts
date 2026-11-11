@@ -32,7 +32,8 @@ Deno.serve(async (req) => {
     for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
     let body;
     try { body = JSON.parse(new TextDecoder().decode(bytes)); } catch { return reply({ error: 'Geçersiz istek.' }, 400); }
-    const { venueId, image, mimeType } = body;
+    const { venueId, image, mimeType, action } = body;
+    if (action != null && !['preview', 'import'].includes(action)) return reply({ error: 'Geçersiz menü işlemi.' }, 400);
     if (typeof venueId !== 'string' || !venueId || venueId.length > 100 || typeof image !== 'string' || !/^[A-Za-z0-9+/]+={0,2}$/.test(image) || !['image/jpeg', 'image/png'].includes(mimeType)) return reply({ error: 'JPEG veya PNG menü fotoğrafı seç.' }, 400);
     let raw;
     try { raw = Uint8Array.from(atob(image), c => c.charCodeAt(0)); } catch { return reply({ error: 'Fotoğraf okunamadı.' }, 400); }
@@ -101,6 +102,12 @@ Deno.serve(async (req) => {
     let items;
     try { items = JSON.parse(output).items; } catch { return reply({ error: 'Menü okunamadı. Daha net bir fotoğraf seç.' }, 422); }
     if (!Array.isArray(items) || !items.length || items.length > 200) return reply({ error: 'Okunabilir TL menüsü bulunamadı. En fazla 200 ürün içeren net bir fotoğraf seç.' }, 422);
+    if (action === 'preview') {
+      stage = 'preview';
+      const { data, error } = await client.rpc('prepare_venue_menu_preview', { p_venue_id: venueId, p_hash: hash, p_items: items });
+      if (error) return reply({ error: error.message }, 400);
+      return reply(data);
+    }
     stage = 'save';
     const { data: count, error } = await client.rpc('commit_venue_menu_import', { p_venue_id: venueId, p_hash: hash, p_items: items });
     if (error) return reply({ error: error.message }, 400);
