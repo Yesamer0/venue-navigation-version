@@ -79,3 +79,13 @@ Verified auth implementation commit: 5cc2e69e40c49a4160e78de3fc1e25bb56c604db on
 
 
 11 Kasım 2. aşama: kayıt öncesi menü değişiklik önizlemesi ve ayrı onay canlıda. 20261111130000 uygulandı/history kayıtlı; Edge import-menu preview eylemi deploy edildi. Önizleme menüyü değiştirmez; aynı SQL birleştirme motorunun geçici sonucunu geri alıp farklarını gösterir. Onay yalnızca sahibine ait tokenla, 15dk içinde ve menü aynıysa çalışır; kayıp yanıtta onay tekrarı güvenlidir. SQL/UI/Edge testleri ve iOS export geçti. Canlı geçici fotoğraf testi 2 yeni/1 güncel/2 eski boy kaldırma, onay öncesi sıfır değişiklik, sadece owner onayı, eksik ailenin korunması ve tekrar güvenliğini doğruladı; geçici hesap/kafe/veriler temizlendi. Fiziksel iPhone’da 2. aşama önizlemesini kullanıcı henüz denemedi. Uzaklaşma/yeniden check-in hâlâ bekliyor.
+
+## 12 Kasım durum güncellemesi
+
+- Kullanıcı menü önizlemesini ve misafir kafe sayfasının son hâlini onayladı.
+- İşletme fotoğraf paylaşımına Kamera ve Galeriden seç seçenekleri eklendi. Kamera, yeni galeri görünümü ve üç fotoğraf sabitleme sınırı için iPhone doğrulaması bekliyor. Aktif check-in ile hesaptan çıkış düzeltmesinin iPhone tekrarı da bekliyor.
+
+### 13 Kasım'da telefonda denenecekler
+
+- [ ] Uzaklaşma ve yeniden check-in. Konumu olan bir mekânda check-in yap. Uygulama açıkken mekândan uzaklaşınca check-in'in otomatik kapandığını ve daha önce paylaştığın fotoğrafın kaldığını kontrol et. Geri dönünce yeniden check-in yap.
+- [ ] İki telefonda yorum ve beğeni. Ayrı Venue hesaplarıyla aynı normal kafenin Ziyaretçiler sekmesinde aynı gezgin fotoğrafını aç. Bir telefondan beğen ve test yorumu yaz. Diğer telefonda yenileyip yorum ile beğeni sayısını kontrol et. Beğeniyi geri al ve test yorumunu sil, ardından diğer telefonda tekrar doğrula.
