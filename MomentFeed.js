@@ -5,7 +5,7 @@ import { supabase } from './supabase';
 import MomentComments from './MomentComments';
 import { friendlyError, PAGE_SIZE, PHOTO_BUCKET, photoUrl } from './momentApi';
 
-export default function MomentFeed({ venueId = null, userId = null, navigation, refreshKey = 0, layout = 'list', isVenueOwner = false, readOnly = false }) {
+export default function MomentFeed({ venueId = null, userId = null, navigation, refreshKey = 0, layout = 'list', isVenueOwner = false, onRestrictedAction }) {
   const [posts, setPosts] = useState([]);
   const [openedId, setOpenedId] = useState(null);
   const [galleryWidth, setGalleryWidth] = useState(0);
@@ -96,7 +96,7 @@ export default function MomentFeed({ venueId = null, userId = null, navigation, 
 
   const renderPost = post => <View key={post.id} style={[s.card, post.kind === 'account' && s.ownerCard]}>
       <View style={s.row}>
-        <TouchableOpacity disabled={readOnly} accessibilityRole={readOnly ? undefined : "button"} accessibilityLabel={readOnly ? undefined : `${post.username} profilini aç`} onPress={() => { setOpenedId(null); navigation.navigate('PublicProfile', { userId: post.user_id }); }}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel={`${post.username} profilini aç`} onPress={onRestrictedAction || (() => { setOpenedId(null); navigation.navigate('PublicProfile', { userId: post.user_id }); })}>
           <Text style={[s.username, post.kind === 'account' && { color: '#2563EB' }]}>{post.kind === 'account' ? 'Mekân sahibi' : `@${post.username || 'Gezgin'}`}</Text>
         </TouchableOpacity>
         <Text style={s.date}>{new Date(post.created_at).toLocaleDateString('tr-TR')}</Text>
@@ -108,14 +108,14 @@ export default function MomentFeed({ venueId = null, userId = null, navigation, 
       {post.caption ? <Text style={s.caption}>{post.caption}</Text> : null}
       {post.kind === 'account' ? <View><Text style={s.ownerLabel}>{post.pinned_at ? '📌 Sabit · ' : ''}Mekân sahibinin paylaşımı</Text>{isVenueOwner && <TouchableOpacity accessibilityRole="button" onPress={() => pin(post)}><Text style={s.link}>{post.pinned_at ? 'Sabitlemeyi kaldır' : '📌 Sabitle (en fazla 3)'}</Text></TouchableOpacity>}</View> : <>
       <View style={s.row}>
-        {readOnly ? <Text style={s.like}>{post.like_count} beğeni</Text> : <TouchableOpacity disabled={pending[post.id]} onPress={() => like(post)} accessibilityRole="button" accessibilityState={{ selected: post.liked_by_me, disabled: !!pending[post.id] }} accessibilityLabel={post.liked_by_me ? 'Beğeniyi kaldır' : 'Fotoğrafı beğen'}>
+        <TouchableOpacity disabled={pending[post.id]} onPress={onRestrictedAction || (() => like(post))} accessibilityRole="button" accessibilityState={{ selected: post.liked_by_me, disabled: !!pending[post.id] }} accessibilityLabel={post.liked_by_me ? 'Beğeniyi kaldır' : 'Fotoğrafı beğen'}>
           <Text style={s.like}>{post.liked_by_me ? '♥' : '♡'} {post.like_count} beğeni</Text>
-        </TouchableOpacity>}
-        {!readOnly && post.is_mine ? <TouchableOpacity disabled={pending[post.id]} onPress={() => Alert.alert('Fotoğrafı sil', 'Bu fotoğraf profilinden ve mekanın fotoğraflarından, yorumları ve beğenileriyle birlikte silinsin mi?', [
+        </TouchableOpacity>
+        {!onRestrictedAction && post.is_mine ? <TouchableOpacity disabled={pending[post.id]} onPress={() => Alert.alert('Fotoğrafı sil', 'Bu fotoğraf profilinden ve mekanın fotoğraflarından, yorumları ve beğenileriyle birlikte silinsin mi?', [
           { text: 'Vazgeç', style: 'cancel' }, { text: 'Sil', style: 'destructive', onPress: () => remove(post) },
         ])}><Text style={s.muted}>Fotoğrafımı sil</Text></TouchableOpacity> : null}
       </View>
-      <MomentComments momentId={post.id} readOnly={readOnly} />
+      <MomentComments momentId={post.id} onRestrictedAction={onRestrictedAction} />
       </>}
     </View>;
 

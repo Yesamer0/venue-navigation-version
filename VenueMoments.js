@@ -6,7 +6,7 @@ import { supabase } from './supabase';
 import MomentFeed from './MomentFeed';
 import { decodePhoto, friendlyError, PHOTO_BUCKET, verifyVenueLocation } from './momentApi';
 
-export default function VenueMoments({ venue, isCheckedIn, navigation, showFeed, onShowPhotos, canPublish = true, feedLayout = 'grid' }) {
+export default function VenueMoments({ venue, isCheckedIn, navigation, showFeed, onShowPhotos, canPublish = true, feedLayout = 'grid', onRestrictedAction }) {
   const [selected, setSelected] = useState(null);
   const [caption, setCaption] = useState('');
   const [busy, setBusy] = useState(false);
@@ -122,6 +122,6 @@ export default function VenueMoments({ venue, isCheckedIn, navigation, showFeed,
       </>}
       {busy ? <ActivityIndicator color="#C2185B" style={{ marginTop: 12 }} /> : null}
     </View>
-    {showFeed ? <MomentFeed venueId={venue.id} navigation={navigation} refreshKey={refreshKey} layout={feedLayout} /> : null}
+    {showFeed ? <MomentFeed venueId={venue.id} navigation={navigation} refreshKey={refreshKey} layout={feedLayout} onRestrictedAction={onRestrictedAction} /> : null}
   </View>;
 }

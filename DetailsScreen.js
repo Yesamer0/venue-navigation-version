@@ -10,6 +10,8 @@ import {
   ActivityIndicator, 
   Dimensions,
   useWindowDimensions,
+  Alert,
+  Platform,
 } from 'react-native';
 import { getFreshLocation } from './deviceLocation';
 import { hasPhotoTestAccess } from './photoTestAccess';
@@ -53,6 +55,22 @@ export default function DetailsScreen({ route, navigation, guest = false }) {
   const { item } = route.params;
   const publicDemo = route.params.publicDemo === true;
   const readOnly = guest || publicDemo;
+  const showNotice = (title, message) => {
+    if (Platform.OS === 'web') window.alert(message);
+    else Alert.alert(title, message);
+  };
+  const showAccountNotice = (message = 'Bu işlemi yapmak için giriş yapmalısın.') => {
+    if (guest) showNotice('Giriş yap', message);
+    else showNotice('Deneme Kafesi', 'Bu işlem deneme kafesinin işletme hesabına açıktır.');
+  };
+  const onRestrictedAction = readOnly ? () => showAccountNotice() : undefined;
+  const openChat = () => {
+    if (readOnly) {
+      showAccountNotice('Sohbete katılmak için giriş yapmalısın.');
+      return;
+    }
+    navigation.navigate('VenueChat', { item });
+  };
   const { width: pageWidth } = useWindowDimensions();
   const accountPager = useRef(null);
 
@@ -1049,7 +1067,7 @@ const taggedPhotos = venuePhotos.filter(
         </View>
 
         {/* Geri butonu */}
-        {!guest && <TouchableOpacity
+        <TouchableOpacity
           onPress={() => navigation.goBack()}
           style={{
             position: 'absolute', top: 15, left: 15,
@@ -1059,12 +1077,11 @@ const taggedPhotos = venuePhotos.filter(
           }}
         >
           <Text style={{ color: '#fff', fontSize: 18, fontWeight: 'bold' }}>‹</Text>
-        </TouchableOpacity>}
+        </TouchableOpacity>
 
-        {!readOnly && <>
         {/* Favori butonu */}
         <TouchableOpacity
-          onPress={handleToggleFavorite}
+          onPress={onRestrictedAction || handleToggleFavorite}
           disabled={loadingFavorite}
           style={{
             position: 'absolute',
@@ -1095,7 +1112,7 @@ const taggedPhotos = venuePhotos.filter(
 
         {/* 📁 Koleksiyona Kaydet Butonu */}
         <TouchableOpacity
-          onPress={() => setShowCollections(!showCollections)}
+          onPress={onRestrictedAction || (() => setShowCollections(!showCollections))}
           style={{
             position: 'absolute',
             top: 60,
@@ -1176,7 +1193,6 @@ const taggedPhotos = venuePhotos.filter(
             )}
           </View>
         )}
-        </>}
       </View>
 
       {/* ===== BAŞLIK BÖLÜMÜ ===== */}
@@ -1202,8 +1218,8 @@ const taggedPhotos = venuePhotos.filter(
                 <Text style={{ color: '#999', fontSize: 12 }}>Şu an kimse check-in yapmamış</Text>
               )}
             </View>
-            {!readOnly && <TouchableOpacity
-  onPress={handleCheckIn}
+            <TouchableOpacity
+  onPress={onRestrictedAction || handleCheckIn}
   disabled={checkingLocation || isCheckedIn}
   style={{
     backgroundColor: '#FF69B4',
@@ -1222,17 +1238,21 @@ const taggedPhotos = venuePhotos.filter(
   {isCheckedIn ? '🟢 Mekandasın' : '📍 Buradayım — Check-in'}
 </Text>
   )}
-</TouchableOpacity>}
+</TouchableOpacity>
           </View>
-          {!publicDemo && <TouchableOpacity
+          <TouchableOpacity
             style={{ backgroundColor: '#4B5563', paddingVertical: 8, paddingHorizontal: 14, borderRadius: 10 }}
             onPress={() => {
+              if (publicDemo) {
+                showNotice('Deneme Kafesi', 'Deneme kafesi için yol tarifi bulunmuyor.');
+                return;
+              }
               const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.name + ' ' + item.location)}`;
               Linking.openURL(mapUrl);
             }}
           >
             <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 12 }}>Yol Tarifi 📍</Text>
-          </TouchableOpacity>}
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -1243,25 +1263,24 @@ const taggedPhotos = venuePhotos.filter(
             <Text style={{ fontWeight: '700', color: activeMainTab === key ? '#fff' : '#666' }}>{label}</Text>
           </TouchableOpacity>
         ))}
-        {!readOnly && <TouchableOpacity onPress={() => navigation.navigate('VenueChat', { item })} style={{ padding: 12 }}><Text>Sohbet 💬</Text></TouchableOpacity>}
+        <TouchableOpacity onPress={openChat} style={{ padding: 12 }}><Text>Sohbet 💬</Text></TouchableOpacity>
       </ScrollView>
 
       {/* ===== İÇERİK ===== */}
-      {activeMainTab === 'photos' && <MomentFeed venueId={item.id} navigation={navigation} layout="grid" isVenueOwner={isOwner} readOnly={readOnly} />}
+      {activeMainTab === 'photos' && <MomentFeed venueId={item.id} navigation={navigation} layout="grid" isVenueOwner={isOwner} onRestrictedAction={onRestrictedAction} />}
       {activeMainTab === 'photos' ? null : (activeMainTab === 'menu' || activeMainTab === 'accountphotos') ? (
         <ScrollView ref={accountPager} scrollEnabled={activeMainTab === 'menu'} keyboardShouldPersistTaps="handled" horizontal pagingEnabled directionalLockEnabled showsHorizontalScrollIndicator={false} contentOffset={{ x: activeMainTab === 'accountphotos' ? pageWidth : 0, y: 0 }} onMomentumScrollEnd={event => setActiveMainTab(Math.round(event.nativeEvent.contentOffset.x / pageWidth) === 0 ? 'menu' : 'accountphotos')}>
         {menuContent}
         <View style={{ width: pageWidth }}><VenueAccountPhotos venue={item} isOwner={isOwner} active={activeMainTab === 'accountphotos'} legacyPhotos={officialPhotos} onDeleteLegacy={handleDeletePhoto} />
-          {activeMainTab === 'accountphotos' && (readOnly
-            ? <MomentFeed venueId={item.id} navigation={navigation} layout="gallery" readOnly />
-            : <VenueMoments venue={item} isCheckedIn={isCheckedIn} navigation={navigation} canPublish={!isVenueAccount} showFeed feedLayout="gallery" onShowPhotos={() => setActiveMainTab('accountphotos')} />
+          {activeMainTab === 'accountphotos' && (
+            <VenueMoments venue={item} isCheckedIn={isCheckedIn} navigation={navigation} canPublish={!isVenueAccount} showFeed feedLayout="gallery" onRestrictedAction={onRestrictedAction} onShowPhotos={() => setActiveMainTab('accountphotos')} />
           )}
         </View>
         </ScrollView>
       ) : (
         <View style={{ paddingHorizontal: 20 }}>
 
-          {!readOnly && <View style={{ backgroundColor: '#FFF5F7', padding: 20, borderRadius: 20, marginBottom: 20, marginTop: 10, borderWidth: 1, borderColor: '#FCE7F3' }}>
+          <View style={{ backgroundColor: '#FFF5F7', padding: 20, borderRadius: 20, marginBottom: 20, marginTop: 10, borderWidth: 1, borderColor: '#FCE7F3' }}>
             <Text style={{ textAlign: 'center', marginBottom: 10, fontWeight: 'bold', color: '#D8A7B1' }}>Deneyimini Puanla ✨</Text>
 
             <View style={{ flexDirection: 'row', justifyContent: 'center', marginBottom: 15 }}>
@@ -1287,18 +1306,18 @@ const taggedPhotos = venuePhotos.filter(
 
             <TouchableOpacity 
               style={[styles.allButton, { marginTop: 15, opacity: isSubmittingReview ? 0.6 : 1, alignItems: 'center', justifyContent: 'center' }]}
-              onPress={handleSendReview}
+              onPress={onRestrictedAction || handleSendReview}
               disabled={isSubmittingReview}
             >
               {isSubmittingReview ? <ActivityIndicator color="#fff" /> : <Text style={styles.allButtonText}>Yorumu Gönder</Text>}
             </TouchableOpacity>
-          </View>}
+          </View>
 
           <Text style={{ fontSize: 19, fontWeight: 'bold', color: '#333', marginBottom: 12 }}>Yorumlar 💬</Text>
           {loadingReviews ? (
             <ActivityIndicator color="#FF69B4" style={{ marginVertical: 20 }} />
           ) : reviews.length === 0 ? (
-            <Text style={{ color: '#999', marginBottom: 20 }}>Henüz yorum yapılmamış.{!readOnly && ' İlk yorumu sen yaz!'}</Text>
+            <Text style={{ color: '#999', marginBottom: 20 }}>Henüz yorum yapılmamış. İlk yorumu sen yaz!</Text>
           ) : (
             <View style={{ marginBottom: 20 }}>
               {reviews.map((review) => (
@@ -1318,11 +1337,11 @@ const taggedPhotos = venuePhotos.filter(
 
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <Text style={{ fontSize: 19, fontWeight: 'bold', color: '#333' }}>Etiketleyenler 🏷️</Text>
-            {!readOnly && <TouchableOpacity onPress={() => setShowAddPhotoForm(!showAddPhotoForm)}>
+            <TouchableOpacity onPress={onRestrictedAction || (() => setShowAddPhotoForm(!showAddPhotoForm))}>
               <Text style={{ color: '#FF69B4', fontWeight: 'bold' }}>
                 {showAddPhotoForm ? 'İptal' : '+ Fotoğraf Ekle'}
               </Text>
-            </TouchableOpacity>}
+            </TouchableOpacity>
           </View>
 
           {!readOnly && showAddPhotoForm && (
