@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { getFreshLocation } from './deviceLocation';
 import DemoCafeButton from './DemoCafeButton';
-import MapView, { Marker, Circle } from 'react-native-maps';
+import VenueMap, { supportsVenueMap } from './VenueMap';
 import { supabase } from './supabase';
 import { useFocusEffect } from '@react-navigation/native';
 import { styles } from './styles';
@@ -467,110 +467,95 @@ export default function HomeScreen({ navigation }) {
         </ScrollView>
       </View>
 
-      <View style={localStyles.mapSection}>
-        <View style={localStyles.mapHeading}>
-          <View>
-            <Text style={localStyles.sectionTitle}>
-              Haritada keşfet
-            </Text>
-            <Text style={localStyles.mapSubtitle}>
-              Yakınındaki mekânları incele
-            </Text>
+      {supportsVenueMap && (
+        <View style={localStyles.mapSection}>
+          <View style={localStyles.mapHeading}>
+            <View>
+              <Text style={localStyles.sectionTitle}>
+                Haritada keşfet
+              </Text>
+              <Text style={localStyles.mapSubtitle}>
+                Yakınındaki mekânları incele
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              onPress={() => setMapVisible((value) => !value)}
+              style={localStyles.mapToggle}
+            >
+              <Text style={localStyles.mapToggleText}>
+                {mapVisible ? 'Gizle −' : 'Göster +'}
+              </Text>
+            </TouchableOpacity>
           </View>
 
-          <TouchableOpacity
-            onPress={() => setMapVisible((value) => !value)}
-            style={localStyles.mapToggle}
-          >
-            <Text style={localStyles.mapToggleText}>
-              {mapVisible ? 'Gizle −' : 'Göster +'}
-            </Text>
-          </TouchableOpacity>
-        </View>
+          {mapVisible && (
+            <>
+              <View style={localStyles.mapControls}>
+                <TouchableOpacity
+                  onPress={() =>
+                    setMapSizeIndex((index) => Math.max(0, index - 1))
+                  }
+                  disabled={mapSizeIndex === 0}
+                  style={[
+                    localStyles.mapSizeButton,
+                    mapSizeIndex === 0 && localStyles.disabledButton,
+                  ]}
+                >
+                  <Text style={localStyles.mapSizeText}>− Küçült</Text>
+                </TouchableOpacity>
 
-        {mapVisible && (
-          <>
-            <View style={localStyles.mapControls}>
-              <TouchableOpacity
-                onPress={() =>
-                  setMapSizeIndex((index) => Math.max(0, index - 1))
-                }
-                disabled={mapSizeIndex === 0}
-                style={[
-                  localStyles.mapSizeButton,
-                  mapSizeIndex === 0 && localStyles.disabledButton,
-                ]}
-              >
-                <Text style={localStyles.mapSizeText}>− Küçült</Text>
-              </TouchableOpacity>
-
-              <Text style={localStyles.mapSizeLabel}>
-                {['Küçük', 'Orta', 'Büyük'][mapSizeIndex]}
-              </Text>
-
-              <TouchableOpacity
-                onPress={() =>
-                  setMapSizeIndex((index) => Math.min(2, index + 1))
-                }
-                disabled={mapSizeIndex === 2}
-                style={[
-                  localStyles.mapSizeButton,
-                  mapSizeIndex === 2 && localStyles.disabledButton,
-                ]}
-              >
-                <Text style={localStyles.mapSizeText}>+ Büyüt</Text>
-              </TouchableOpacity>
-            </View>
-
-            <Text accessibilityLiveRegion="polite" style={{ color: COLORS.pinkDark, marginBottom: 8, lineHeight: 20 }}>
-              {locatingMap ? 'Telefonundan güncel konum alınıyor…' : mapLocationError || (userLocation ? `Mavi işaret son konumun · GPS hata payı yaklaşık ±${Math.ceil(userLocation.accuracy)} m` : 'Konumunu göstermek için Konumum düğmesine dokun.')}
-            </Text>
-            <View
-              style={[
-                localStyles.mapContainer,
-                { height: MAP_HEIGHTS[mapSizeIndex] },
-              ]}
-            >
-              <MapView
-                style={{ width: '100%', height: '100%' }}
-                region={mapRegion}
-                onRegionChangeComplete={setMapRegion}
-              >
-                {userLocation && <>
-                  <Circle center={userLocation} radius={userLocation.accuracy} strokeColor="#2563EB" fillColor="rgba(37, 99, 235, 0.12)" />
-                  <Marker coordinate={userLocation} pinColor="#2563EB" title="Konumun" description={`Son GPS ölçümü · yaklaşık ±${Math.ceil(userLocation.accuracy)} m`} zIndex={10} />
-                </>}
-                {mapVenues.map((venue) => (
-                  <Marker
-                    key={venue.id}
-                    coordinate={{
-                      latitude: Number(venue.latitude),
-                      longitude: Number(venue.longitude),
-                    }}
-                    title={venue.name}
-                    description={venue.location}
-                    onPress={() =>
-                      navigation.navigate('Details', { item: venue })
-                    }
-                  />
-                ))}
-              </MapView>
-
-              <TouchableOpacity
-                onPress={goToMyLocation}
-                disabled={locatingMap}
-                accessibilityRole="button"
-                accessibilityLabel="Haritayı güncel konumuma götür"
-                style={localStyles.locationButton}
-              >
-                <Text style={localStyles.locationButtonText}>
-                  {locatingMap ? 'Konum alınıyor…' : '📍 Konumum'}
+                <Text style={localStyles.mapSizeLabel}>
+                  {['Küçük', 'Orta', 'Büyük'][mapSizeIndex]}
                 </Text>
-              </TouchableOpacity>
-            </View>
-          </>
-        )}
-      </View>
+
+                <TouchableOpacity
+                  onPress={() =>
+                    setMapSizeIndex((index) => Math.min(2, index + 1))
+                  }
+                  disabled={mapSizeIndex === 2}
+                  style={[
+                    localStyles.mapSizeButton,
+                    mapSizeIndex === 2 && localStyles.disabledButton,
+                  ]}
+                >
+                  <Text style={localStyles.mapSizeText}>+ Büyüt</Text>
+                </TouchableOpacity>
+              </View>
+
+              <Text accessibilityLiveRegion="polite" style={{ color: COLORS.pinkDark, marginBottom: 8, lineHeight: 20 }}>
+                {locatingMap ? 'Telefonundan güncel konum alınıyor…' : mapLocationError || (userLocation ? `Mavi işaret son konumun · GPS hata payı yaklaşık ±${Math.ceil(userLocation.accuracy)} m` : 'Konumunu göstermek için Konumum düğmesine dokun.')}
+              </Text>
+              <View
+                style={[
+                  localStyles.mapContainer,
+                  { height: MAP_HEIGHTS[mapSizeIndex] },
+                ]}
+              >
+                <VenueMap
+                  mapRegion={mapRegion}
+                  setMapRegion={setMapRegion}
+                  userLocation={userLocation}
+                  mapVenues={mapVenues}
+                  onSelectVenue={(venue) => navigation.navigate('Details', { item: venue })}
+                />
+
+                <TouchableOpacity
+                  onPress={goToMyLocation}
+                  disabled={locatingMap}
+                  accessibilityRole="button"
+                  accessibilityLabel="Haritayı güncel konumuma götür"
+                  style={localStyles.locationButton}
+                >
+                  <Text style={localStyles.locationButtonText}>
+                    {locatingMap ? 'Konum alınıyor…' : '📍 Konumum'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
+        </View>
+      )}
 
       <View style={localStyles.resultsHeading}>
         <Text style={localStyles.sectionTitle}>
