@@ -2,15 +2,14 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "Venue: Expo Go",
+      "label": "Venue: Expo Go (LAN)",
       "type": "process",
       "command": "node",
       "args": [
         "./node_modules/expo/bin/cli",
         "start",
         "--go",
-        "--tunnel",
-        "ngrok"
+        "--lan"
       ],
       "options": {
         "cwd": "${workspaceFolder}",
@@ -22,26 +21,18 @@
         "kind": "build",
         "isDefault": true
       },
-      "problemMatcher": [],
-      "windows": {
-        "options": {
-          "env": {
-            "EXPO_NO_REDIRECT_PAGE": "1",
-            "ANDROID_HOME": "",
-            "ANDROID_SDK_ROOT": ""
-          }
-        }
-      }
+      "problemMatcher": []
     },
     {
-      "label": "Venue: Expo Go (LAN)",
+      "label": "Venue: Expo Go (Expo tunnel)",
       "type": "process",
       "command": "node",
       "args": [
         "./node_modules/expo/bin/cli",
         "start",
         "--go",
-        "--lan"
+        "--tunnel",
+        "expo"
       ],
       "options": {
         "cwd": "${workspaceFolder}",
