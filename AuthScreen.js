@@ -121,7 +121,7 @@ export default function AuthScreen({ navigation }) {
           </Text>
         </TouchableOpacity>
         <TouchableOpacity disabled={loading} onPress={() => navigation.navigate('Guest')} style={styles.switchButton}>
-          <Text style={styles.switchText}>Misafir olarak menülere göz at</Text>
+          <Text style={styles.switchText}>Misafir olarak keşfet</Text>
         </TouchableOpacity>
       </View>
       </ScrollView>

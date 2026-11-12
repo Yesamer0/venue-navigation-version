@@ -25,9 +25,10 @@ export default function HomeStack({ navigation, guest = false }) {
         <Stack.Screen name="GuestHome" options={{ headerShown: false }}>
           {props => <HomeScreen {...props} guest onSignIn={() => navigation.goBack()} />}
         </Stack.Screen>
-        <Stack.Screen name="Details" options={{ title: 'Menü' }}>
+        <Stack.Screen name="Details" options={{ title: 'Mekân' }}>
           {props => <DetailsScreen {...props} guest />}
         </Stack.Screen>
+        <Stack.Screen name="MomentPhoto" component={MomentPhotoScreen} options={{ title: 'Fotoğraf' }} />
       </> : <>
         <Stack.Screen name="HomeMain" component={HomeScreen} options={{ headerShown: false }} />
         <Stack.Screen name="PublicProfile" component={PublicProfileScreen} options={{ title: 'Profil' }} />

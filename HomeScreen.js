@@ -59,7 +59,7 @@ const calculateDistance = (lat1, lon1, lat2, lon2) => {
 
 export default function HomeScreen({ navigation, guest = false, onSignIn }) {
   const [venues, setVenues] = useState([]);
-  const [publicDemoMenuId, setPublicDemoMenuId] = useState(null);
+  const [publicDemoCafe, setPublicDemoCafe] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const venuesRequestRef = useRef(0);
@@ -87,11 +87,11 @@ export default function HomeScreen({ navigation, guest = false, onSignIn }) {
     fetchVenues();
     fetchRatings();
     let active = true;
-    const loadDemoMenu = async () => {
-      const { data, error } = await supabase.rpc('get_public_demo_menu');
-      if (active && !error) setPublicDemoMenuId(data);
+    const loadDemoCafe = async () => {
+      const { data, error } = await supabase.rpc('get_public_demo_cafe');
+      if (active && !error) setPublicDemoCafe(data);
     };
-    void loadDemoMenu().catch(() => {});
+    void loadDemoCafe().catch(() => {});
     return () => { active = false; };
   }, []));
 
@@ -335,16 +335,16 @@ export default function HomeScreen({ navigation, guest = false, onSignIn }) {
           <Text style={{ color: '#9B1B4D', fontWeight: '700' }}>Giriş yap / Kayıt ol</Text>
         </TouchableOpacity>
       ) : <DemoCafeButton navigation={navigation} />}
-      {publicDemoMenuId && (
+      {publicDemoCafe && (
         <TouchableOpacity
           accessibilityRole="button"
           style={{ padding: 16 }}
           onPress={() => navigation.navigate('Details', {
-            item: { id: publicDemoMenuId, name: 'Deneme Kafesi' },
-            menuOnly: true,
+            item: publicDemoCafe,
+            publicDemo: true,
           })}
         >
-          <Text style={{ color: '#9B1B4D', fontWeight: '700' }}>Deneme kafesinin menüsünü gör</Text>
+          <Text style={{ color: '#9B1B4D', fontWeight: '700' }}>Deneme Kafesi</Text>
         </TouchableOpacity>
       )}
       <View style={localStyles.searchSection}>

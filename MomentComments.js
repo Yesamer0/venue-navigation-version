@@ -3,7 +3,7 @@ import { ActivityIndicator, Alert, Text, TextInput, TouchableOpacity, View } fro
 import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from './supabase';
 
-export default function MomentComments({ momentId }) {
+export default function MomentComments({ momentId, readOnly = false }) {
   const [open, setOpen] = useState(false);
   const [comments, setComments] = useState([]);
   const [text, setText] = useState('');
@@ -68,19 +68,21 @@ export default function MomentComments({ momentId }) {
       <Text style={{ color: '#9B1B4D', fontWeight: '600', paddingVertical: 12 }}>💬 {open ? 'Yorumları kapat' : 'Yorumlar'}</Text>
     </TouchableOpacity>
     {open && <>
+      {!readOnly && <>
       <TextInput accessibilityLabel="Fotoğrafa yorum yaz" placeholder="Bu fotoğrafa yorum yaz…" value={text}
         onChangeText={value => { setText(value); requestId.current = null; }} maxLength={500} multiline editable={!sending}
         style={{ backgroundColor: '#FFF8FB', borderRadius: 12, borderWidth: 1, borderColor: '#E8CFDB', padding: 12, minHeight: 60 }} />
       <TouchableOpacity accessibilityRole="button" disabled={sending || !text.trim()} onPress={send}>
         <Text style={{ color: '#9B1B4D', fontWeight: '700', paddingVertical: 12, opacity: sending || !text.trim() ? 0.5 : 1 }}>{sending ? 'Gönderiliyor…' : 'Yorumu gönder'}</Text>
       </TouchableOpacity>
+      </>}
       {!!error && <Text accessibilityRole="alert" style={{ color: '#B42318', paddingVertical: 8 }}>{error}</Text>}
       <TouchableOpacity accessibilityRole="button" disabled={loading} onPress={() => load()}><Text style={{ color: '#9B1B4D', paddingVertical: 8 }}>Yorumları yenile</Text></TouchableOpacity>
-      {!loading && !comments.length && !error && <Text style={{ color: '#777', paddingVertical: 10 }}>İlk yorumu sen yaz.</Text>}
+      {!loading && !comments.length && !error && <Text style={{ color: '#777', paddingVertical: 10 }}>Henüz yorum yok.{!readOnly && ' İlk yorumu sen yaz.'}</Text>}
       {comments.map(comment => <View key={comment.id} style={{ backgroundColor: '#FFF8FB', padding: 12, borderRadius: 12, marginBottom: 8 }}>
         <Text style={{ color: '#9B1B4D', fontWeight: '700' }}>@{comment.username}</Text>
         <Text style={{ color: '#333', lineHeight: 21, marginTop: 6 }}>{comment.body}</Text>
-        {comment.is_mine && <TouchableOpacity accessibilityRole="button" onPress={() => remove(comment)}><Text style={{ color: '#777', paddingTop: 10 }}>Yorumumu sil</Text></TouchableOpacity>}
+        {!readOnly && comment.is_mine && <TouchableOpacity accessibilityRole="button" onPress={() => remove(comment)}><Text style={{ color: '#777', paddingTop: 10 }}>Yorumumu sil</Text></TouchableOpacity>}
       </View>)}
       {loading && <ActivityIndicator color="#9B1B4D" />}
       {more && !loading && <TouchableOpacity onPress={() => load(true)}><Text style={{ color: '#9B1B4D', paddingVertical: 12 }}>Daha fazla yorum</Text></TouchableOpacity>}
