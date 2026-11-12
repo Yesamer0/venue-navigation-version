@@ -17,17 +17,17 @@ import DemoCafeButton from './DemoCafeButton';
 import VenueMap, { supportsVenueMap } from './VenueMap';
 import { supabase } from './supabase';
 import { useFocusEffect } from '@react-navigation/native';
-import { styles } from './styles';
+import { palette } from './theme';
 
 const COLORS = {
-  background: '#FFF9FC',
-  pinkLight: '#FFEAF2',
-  pinkSoft: '#FDE4EE',
-  pinkBorder: '#F4B4CB',
-  pink: '#C2185B',
-  pinkDark: '#9B1B4D',
-  muted: '#B37690',
-  white: '#FFFFFF',
+  background: palette.canvas,
+  pinkLight: palette.canvas,
+  pinkSoft: palette.blush,
+  pinkBorder: palette.border,
+  pink: palette.accent,
+  pinkDark: palette.ink,
+  muted: palette.muted,
+  white: palette.surface,
 };
 
 const PRICE_LEVELS = ['₺', '₺₺', '₺₺₺'];
@@ -80,7 +80,8 @@ export default function HomeScreen({ navigation, guest = false, onSignIn }) {
   const [mapRegion, setMapRegion] = useState({ latitude: 37.2153, longitude: 28.3636, latitudeDelta: 0.05, longitudeDelta: 0.05 });
   const [mapLocationError, setMapLocationError] = useState('');
   const [mapSizeIndex, setMapSizeIndex] = useState(1);
-  const [mapVisible, setMapVisible] = useState(true);
+  const [mapVisible, setMapVisible] = useState(false);
+  const [filtersVisible, setFiltersVisible] = useState(false);
 
 
   useFocusEffect(useCallback(() => {
@@ -324,29 +325,13 @@ export default function HomeScreen({ navigation, guest = false, onSignIn }) {
         </View>
       )}
       <View style={localStyles.header}>
-        <Text style={localStyles.brand}>VENUE · MEKSO</Text>
-        <Text style={localStyles.subtitle}>
-          Keşfet · Deneyimle · Paylaş
-        </Text>
+        <Text style={localStyles.brand} accessibilityRole="header">Keşfet</Text>
+        {guest ? (
+          <TouchableOpacity accessibilityRole="button" onPress={onSignIn} style={localStyles.headerAction}>
+            <Text style={localStyles.headerActionText}>Giriş yap</Text>
+          </TouchableOpacity>
+        ) : <Text style={localStyles.wordmark}>Venue</Text>}
       </View>
-
-      {guest ? (
-        <TouchableOpacity accessibilityRole="button" onPress={onSignIn} style={{ padding: 16 }}>
-          <Text style={{ color: '#9B1B4D', fontWeight: '700' }}>Giriş yap / Kayıt ol</Text>
-        </TouchableOpacity>
-      ) : <DemoCafeButton navigation={navigation} />}
-      {publicDemoCafe && (
-        <TouchableOpacity
-          accessibilityRole="button"
-          style={{ padding: 16 }}
-          onPress={() => navigation.navigate('Details', {
-            item: publicDemoCafe,
-            publicDemo: true,
-          })}
-        >
-          <Text style={{ color: '#9B1B4D', fontWeight: '700' }}>Deneme Kafesi</Text>
-        </TouchableOpacity>
-      )}
       <View style={localStyles.searchSection}>
         <View style={localStyles.searchBar}>
           <Text style={localStyles.searchIcon}>⌕</Text>
@@ -373,9 +358,7 @@ export default function HomeScreen({ navigation, guest = false, onSignIn }) {
       </View>
 
       <View style={localStyles.section}>
-        <Text style={localStyles.sectionTitle}>
-          Ne keşfetmek istersin?
-        </Text>
+        <Text style={[localStyles.sectionTitle, localStyles.categoryHeading]}>Nereye gitsek?</Text>
 
         <ScrollView
           horizontal
@@ -414,14 +397,16 @@ export default function HomeScreen({ navigation, guest = false, onSignIn }) {
 
       <View style={localStyles.section}>
         <View style={localStyles.sectionHeadingRow}>
-          <Text style={localStyles.sectionTitle}>Filtreler</Text>
-
-          <TouchableOpacity onPress={resetFilters}>
-            <Text style={localStyles.resetText}>Temizle</Text>
+          <TouchableOpacity accessibilityRole="button" accessibilityState={{ expanded: filtersVisible }}
+            onPress={() => setFiltersVisible(value => !value)} style={localStyles.headerAction}>
+            <Text style={localStyles.headerActionText}>Filtreler {filtersVisible ? '−' : '+'}</Text>
           </TouchableOpacity>
+          {filtersVisible && <TouchableOpacity onPress={resetFilters} style={localStyles.headerAction}>
+            <Text style={localStyles.resetText}>Temizle</Text>
+          </TouchableOpacity>}
         </View>
 
-        <ScrollView
+        {filtersVisible && <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={localStyles.horizontalContent}
@@ -445,7 +430,7 @@ export default function HomeScreen({ navigation, guest = false, onSignIn }) {
               </Text>
             </TouchableOpacity>
           ))}
-        </ScrollView>
+        </ScrollView>}
       </View>
 
       <View style={localStyles.section}>
@@ -498,9 +483,7 @@ export default function HomeScreen({ navigation, guest = false, onSignIn }) {
               <Text style={localStyles.sectionTitle}>
                 Haritada keşfet
               </Text>
-              <Text style={localStyles.mapSubtitle}>
-                Yakınındaki mekânları incele
-              </Text>
+
             </View>
 
             <TouchableOpacity
@@ -581,6 +564,15 @@ export default function HomeScreen({ navigation, guest = false, onSignIn }) {
         </View>
       )}
 
+      {!guest && <DemoCafeButton navigation={navigation} />}
+      {publicDemoCafe && (
+        <TouchableOpacity accessibilityRole="button" style={localStyles.demoLink}
+          onPress={() => navigation.navigate('Details', { item: publicDemoCafe, publicDemo: true })}>
+          <Text style={localStyles.headerActionText}>Deneme Kafesi</Text>
+          <Text style={localStyles.headerActionText}>›</Text>
+        </TouchableOpacity>
+      )}
+
       <View style={localStyles.resultsHeading}>
         <Text style={localStyles.sectionTitle}>
           Senin için mekânlar
@@ -594,44 +586,8 @@ export default function HomeScreen({ navigation, guest = false, onSignIn }) {
   );
 
   const renderVenue = ({ item }) => (
-    <TouchableOpacity
-      style={styles.card}
-      onPress={() => navigation.navigate('Details', { item })}
-    >
-      <Image
-        source={{ uri: item.image_url }}
-        style={styles.image}
-      />
-
-      <View style={styles.cardContent}>
-        <Text style={styles.venueName}>{item.name}</Text>
-
-        <Text style={styles.venueLocation}>
-          {item.location}
-        </Text>
-
-        {userLocation &&
-          item.latitude != null &&
-          item.longitude != null && (
-            <Text style={localStyles.distanceText}>
-              📍{' '}
-              {calculateDistance(
-                userLocation.latitude,
-                userLocation.longitude,
-                Number(item.latitude),
-                Number(item.longitude)
-              ).toFixed(1)}{' '}
-              km uzakta
-            </Text>
-          )}
-
-        {venueRatings[item.id] != null && (
-          <Text style={localStyles.ratingText}>
-            ⭐ {venueRatings[item.id].toFixed(1)}
-          </Text>
-        )}
-      </View>
-    </TouchableOpacity>
+    <VenueCard item={item} rating={venueRatings[item.id]} userLocation={userLocation}
+      onPress={() => navigation.navigate('Details', { item })} />
   );
 
   if (loading && venues.length === 0 && !loadError) {
@@ -684,6 +640,39 @@ export default function HomeScreen({ navigation, guest = false, onSignIn }) {
   );
 }
 
+function VenueCard({ item, rating, userLocation, onPress }) {
+  const [failedImage, setFailedImage] = useState(null);
+  const hasPhoto = !!item.image_url && item.image_url !== failedImage;
+  const distance = userLocation && item.latitude != null && item.longitude != null
+    ? calculateDistance(userLocation.latitude, userLocation.longitude, Number(item.latitude), Number(item.longitude))
+    : null;
+
+  return (
+    <TouchableOpacity accessibilityRole="button" style={localStyles.venueCard} onPress={onPress}>
+      {hasPhoto && (
+        <View style={localStyles.venueImage}>
+          <Image source={{ uri: item.image_url }} style={StyleSheet.absoluteFillObject}
+            onError={() => setFailedImage(item.image_url)} />
+          {!!item.category && <Text style={localStyles.venueCategory}>{item.category}</Text>}
+        </View>
+      )}
+      <View style={localStyles.venueBody}>
+        {!hasPhoto && !!item.category && <Text style={localStyles.venueCategoryLabel}>{item.category}</Text>}
+        <View style={localStyles.venueHeading}>
+          <Text style={localStyles.venueTitle}>{item.name}</Text>
+          {rating != null && <Text style={localStyles.ratingText}>★ {rating.toFixed(1)}</Text>}
+        </View>
+        {(!!item.location || distance != null) && (
+          <View style={localStyles.venueMeta}>
+            {!!item.location && <Text style={localStyles.venueLocation}>{item.location}</Text>}
+            {distance != null && <Text style={localStyles.distanceText}>{distance.toFixed(1)} km</Text>}
+          </View>
+        )}
+      </View>
+    </TouchableOpacity>
+  );
+}
+
 const localStyles = StyleSheet.create({
   container: {
     flex: 1,
@@ -704,25 +693,27 @@ const localStyles = StyleSheet.create({
     paddingBottom: 30,
   },
   header: {
-    backgroundColor: COLORS.pinkLight,
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: 20,
-    paddingBottom: 12,
-    paddingHorizontal: 16,
+    justifyContent: 'space-between',
+    paddingTop: 14,
+    paddingBottom: 16,
+    paddingHorizontal: 20,
   },
-  brand: {
-    fontFamily: 'Chewy_400Regular',
-    fontSize: 34,
-    color: COLORS.pinkDark,
-    letterSpacing: 1,
-    textAlign: 'center',
+  brand: { fontSize: 32, fontWeight: '800', color: palette.ink, letterSpacing: -1 },
+  wordmark: { fontFamily: 'Chewy_400Regular', fontSize: 25, color: palette.accent },
+  headerAction: {
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    backgroundColor: palette.blush,
   },
-  subtitle: {
-    marginTop: 3,
-    fontSize: 11,
-    fontWeight: '600',
-    letterSpacing: 1.5,
-    color: COLORS.muted,
+  headerActionText: { color: palette.accentPressed, fontSize: 13, fontWeight: '700' },
+  demoLink: {
+    minHeight: 44, marginHorizontal: 18, marginTop: 8, paddingHorizontal: 14,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: palette.surface, borderColor: palette.border, borderWidth: 1, borderRadius: 14,
   },
   searchSection: {
     backgroundColor: COLORS.pinkLight,
@@ -867,11 +858,6 @@ const localStyles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 10,
   },
-  mapSubtitle: {
-    fontSize: 11,
-    color: COLORS.muted,
-    marginTop: 3,
-  },
   mapToggle: {
     backgroundColor: COLORS.pinkSoft,
     paddingHorizontal: 13,
@@ -948,17 +934,24 @@ const localStyles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
-  distanceText: {
-    color: COLORS.muted,
-    fontSize: 12,
-    marginTop: 3,
+  venueCard: {
+    backgroundColor: palette.surface, marginHorizontal: 18, marginBottom: 16,
+    borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: palette.border,
   },
-  ratingText: {
-    color: COLORS.pink,
-    fontSize: 13,
-    fontWeight: '700',
-    marginTop: 3,
+  venueImage: { width: '100%', height: 170, backgroundColor: palette.roseTint },
+  venueCategory: {
+    position: 'absolute', left: 12, top: 12, paddingHorizontal: 12, paddingVertical: 6,
+    borderRadius: 12, backgroundColor: palette.surface, color: palette.ink, fontSize: 12, fontWeight: '700',
   },
+  categoryHeading: { marginHorizontal: 18, marginBottom: 8 },
+  venueCategoryLabel: { color: palette.accent, fontSize: 12, fontWeight: '700' },
+  venueBody: { padding: 15, gap: 5 },
+  venueHeading: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 },
+  venueTitle: { flex: 1, fontSize: 18, fontWeight: '800', color: palette.ink },
+  venueMeta: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 },
+  venueLocation: { color: palette.muted, fontSize: 13, flexShrink: 1 },
+  distanceText: { color: palette.muted, fontSize: 12 },
+  ratingText: { color: palette.gold, fontSize: 13, fontWeight: '800' },
   emptyContainer: {
     alignItems: 'center',
     paddingHorizontal: 30,

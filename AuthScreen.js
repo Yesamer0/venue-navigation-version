@@ -1,3 +1,4 @@
+import { palette } from './theme';
 import React, { useRef, useState } from 'react';
 import { 
   View, 
@@ -135,18 +136,18 @@ export default function AuthScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FFF0F5', padding: 20 },
-  card: { width: Platform.OS === 'web' ? 400 : '100%', backgroundColor: '#fff', borderRadius: 16, padding: 30 },
-  title: { fontSize: 36, fontWeight: 'bold', color: '#FF69B4', textAlign: 'center', marginBottom: 5 },
+  container: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: palette.canvas, padding: 20 },
+  card: { width: '100%', maxWidth: 400, backgroundColor: '#fff', borderRadius: 16, padding: 30 },
+  title: { fontSize: 36, fontWeight: 'bold', color: palette.accent, textAlign: 'center', marginBottom: 5 },
   subtitle: { fontSize: 14, color: '#888', textAlign: 'center', marginBottom: 25 },
-  input: { height: 50, borderWidth: 1, borderColor: '#FFE4E1', borderRadius: 10, paddingHorizontal: 15, marginBottom: 15, fontSize: 16, backgroundColor: '#FAFAFA', color: '#333' },
-  checkboxRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FAFAFA', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#FFE4E1', marginBottom: 15 },
-  checkboxRowActive: { borderColor: '#FF69B4', backgroundColor: '#FFF0F5' },
-  checkboxCircle: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: '#FF69B4', marginRight: 10 },
-  checkboxCircleChecked: { backgroundColor: '#FF69B4' },
+  input: { height: 50, borderWidth: 1, borderColor: palette.border, borderRadius: 10, paddingHorizontal: 15, marginBottom: 15, fontSize: 16, backgroundColor: '#FAFAFA', color: '#333' },
+  checkboxRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FAFAFA', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: palette.border, marginBottom: 15 },
+  checkboxRowActive: { borderColor: palette.accent, backgroundColor: palette.canvas },
+  checkboxCircle: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: palette.accent, marginRight: 10 },
+  checkboxCircleChecked: { backgroundColor: palette.accent },
   checkboxLabel: { fontSize: 14, color: '#666', fontWeight: '500' },
   checkboxLabelActive: { color: '#DB7093', fontWeight: 'bold' },
-  button: { backgroundColor: '#FF69B4', height: 50, borderRadius: 10, justifyContent: 'center', alignItems: 'center', marginTop: 10 },
+  button: { backgroundColor: palette.accent, height: 50, borderRadius: 10, justifyContent: 'center', alignItems: 'center', marginTop: 10 },
   buttonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
   switchButton: { marginTop: 20, alignItems: 'center' },
   switchText: { color: '#DB7093', fontSize: 14, fontWeight: '500' }

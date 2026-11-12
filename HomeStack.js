@@ -1,5 +1,6 @@
 import React from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
+import { palette } from './theme';
 
 import HomeScreen from './HomeScreen';
 import DetailsScreen from './DetailsScreen';
@@ -16,8 +17,8 @@ export default function HomeStack({ navigation, guest = false }) {
   return (
     <Stack.Navigator
       screenOptions={{
-        headerStyle: { backgroundColor: '#fff' },
-        headerTintColor: '#D8A7B1',
+        headerStyle: { backgroundColor: palette.surface },
+        headerTintColor: palette.accentPressed,
         headerTitleStyle: { fontWeight: 'bold' },
       }}
     >

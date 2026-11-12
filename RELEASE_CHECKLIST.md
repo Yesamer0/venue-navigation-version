@@ -95,3 +95,14 @@ Verified auth implementation commit: 5cc2e69e40c49a4160e78de3fc1e25bb56c604db on
 - Giriş ekranına Şifremi unuttum eklendi. Kurtarma kodu normal oturumdan ayrı, diske kaydedilmeyen bir oturumda doğrulanır. Canlı geçici hesapla kodun tek kullanımlık olduğu, yeni şifrenin çalıştığı ve eski şifrenin reddedildiği doğrulandı.
 - Canlı Auth için kurtarma şablonu repoda `supabase/templates/password_recovery.html` dosyasında. Varsayılan Supabase SMTP yalnızca proje ekibine e-posta teslim eder. Genel kullanıcıların şifre sıfırlaması için özel SMTP ayarlanmalı ve gerçek e-posta teslimi denenmeli.
 - Hesap silme ve kapsamlı yetki denetimi bekliyor. Eski profil parola alanı için yalnızca satır sayısı ve şema bağımlılıkları kontrol edildi.
+
+### 5. bölüm, iPhone paketi ve bildirimler
+
+- Venue, Expo'da `@yesamer/venue-app` projesine bağlandı. iOS kimliği `com.yesamer.venue`. `eas.json` içinde development, preview ve production profilleri var. iPhone denemesi için preview profili dahili dağıtım kullanır.
+- İmzalı iPhone paketi ve gerçek push testi için Apple Developer imzalama bilgileri, APNs anahtarı ve test iPhone kayıtları gerekiyor. İmzalı paket hazırlanmadı ve mağazaya gönderilmedi.
+- Bildirim izinleri ve hesap bazlı cihaz kaydı yapılandırıldı. Çıkışta sadece bu cihazın token'ı silinir. Canlı token izinleri iki hesapla doğrulandı. Bildirim Edge Function güncellendi. Expo Go'da uzaktan bildirim testi yapılmaz.
+
+### 6. bölüm, soft pembe arayüz
+
+- Keşfet, kafe, sohbet, profil ve hesap ekranlarında ortak soft pembe palet. Mekân fotoğrafı varsa geniş kartta gösterilir. Harita ve filtreler başlangıçta kapalıdır, ilgili düğmelerle açılır.
+- Menü, yorum, fotoğraf ve sohbet yükleme/hata durumları güncellendi. iOS ve web paketi derlendi. Keşfet ve kafe ekranları mobil tarayıcıda 390 ve 320 piksel genişlikte kontrol edildi. Fiziksel iPhone'da klavye ve uzun liste kontrolü bekliyor.

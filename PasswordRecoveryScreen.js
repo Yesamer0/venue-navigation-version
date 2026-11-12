@@ -1,3 +1,4 @@
+import { palette } from './theme';
 import React, { useRef, useState } from 'react';
 import {
   ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet,
@@ -108,15 +109,15 @@ export default function PasswordRecoveryScreen({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FFF0F5' },
+  container: { flex: 1, backgroundColor: palette.canvas },
   content: { flexGrow: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
   card: { width: '100%', maxWidth: 400, backgroundColor: '#fff', borderRadius: 16, padding: 24 },
-  title: { fontSize: 28, fontWeight: '700', color: '#9B1B4D', marginBottom: 16 },
+  title: { fontSize: 28, fontWeight: '700', color: palette.accentPressed, marginBottom: 16 },
   description: { color: '#555', lineHeight: 22, marginBottom: 12 },
   input: { minHeight: 48, borderWidth: 1, borderColor: '#F3CEDD', borderRadius: 10, padding: 12, marginBottom: 12, color: '#333' },
   error: { color: '#B42318', lineHeight: 20, marginBottom: 12 },
-  button: { minHeight: 48, justifyContent: 'center', alignItems: 'center', backgroundColor: '#9B1B4D', borderRadius: 10, padding: 12 },
+  button: { minHeight: 48, justifyContent: 'center', alignItems: 'center', backgroundColor: palette.accentPressed, borderRadius: 10, padding: 12 },
   buttonText: { color: '#fff', fontWeight: '700' },
   link: { minHeight: 44, justifyContent: 'center', alignItems: 'center', marginTop: 4 },
-  linkText: { color: '#9B1B4D', fontWeight: '600' },
+  linkText: { color: palette.accentPressed, fontWeight: '600' },
 });

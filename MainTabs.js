@@ -1,6 +1,7 @@
 import React from 'react';
 import { Text } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { palette } from './theme';
 
 import HomeStack from './HomeStack';
 import ProfileStack from './ProfileStack';
@@ -15,12 +16,12 @@ export default function MainTabs() {
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: '#FF69B4',
-        tabBarInactiveTintColor: '#B0B0B0',
+        tabBarActiveTintColor: palette.accent,
+        tabBarInactiveTintColor: palette.muted,
         tabBarStyle: {
-          height: 60,
-          paddingBottom: 8,
-          paddingTop: 6,
+          backgroundColor: palette.surface,
+          borderTopColor: palette.border,
+          paddingTop: 4,
         },
         tabBarLabelStyle: {
           fontSize: 12,
@@ -32,7 +33,7 @@ export default function MainTabs() {
         name="HomeTab"
         component={HomeStack}
         options={{
-          tabBarLabel: 'Ana Sayfa',
+          tabBarLabel: 'Keşfet',
           tabBarIcon: ({ color, size }) => (
             <Text style={{ fontSize: size ? size - 4 : 20, color }}>🏠</Text>
           ),

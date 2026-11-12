@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import * as Location from 'expo-location';
 import { supabase } from './supabase';
+import { palette } from './theme';
 
 const PROXIMITY_METERS = 100;
 const HISTORY_HOURS = 3;
@@ -57,6 +58,7 @@ export default function VenueChatScreen({ route, navigation }) {
 
   const [messages, setMessages] = useState([]);
   const [loadingMessages, setLoadingMessages] = useState(true);
+  const [messageLoadFailed, setMessageLoadFailed] = useState(false);
   const [messageText, setMessageText] = useState('');
   const [sendAnonymous, setSendAnonymous] = useState(false);
   const [anonName, setAnonName] = useState(generateAnonName());
@@ -281,21 +283,28 @@ const removePresence = async (userId) => {
 
   const fetchMessages = async () => {
     setLoadingMessages(true);
-    const cutoff = new Date(Date.now() - HISTORY_HOURS * 60 * 60 * 1000).toISOString();
+    setMessageLoadFailed(false);
+    try {
+      const cutoff = new Date(Date.now() - HISTORY_HOURS * 60 * 60 * 1000).toISOString();
 
-    const { data, error } = await supabase
-      .from('messages')
-      .select('*')
-      .eq('venue_id', item.id)
-      .gte('created_at', cutoff)
-      .order('created_at', { ascending: true });
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('venue_id', item.id)
+        .gte('created_at', cutoff)
+        .order('created_at', { ascending: true });
 
-    if (error) {
-      console.log('Mesaj çekme hatası:', error);
-    } else {
-      setMessages(data || []);
+      if (error) {
+        setMessageLoadFailed(true);
+        console.log('Mesaj çekme hatası:', error);
+      } else {
+        setMessages(data || []);
+      }
+    } catch {
+      setMessageLoadFailed(true);
+    } finally {
+      setLoadingMessages(false);
     }
-    setLoadingMessages(false);
   };
 
   const subscribeToMessages = () => {
@@ -412,7 +421,7 @@ const handleSend = async () => {
   // --- Konum kontrol ekranı ---
   if (checkingLocation) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff', padding: 20 }}>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: palette.canvas, padding: 20 }}>
         <ActivityIndicator size="large" color="#FF69B4" />
         <Text style={{ marginTop: 15, color: '#666' }}>Konumun kontrol ediliyor...</Text>
       </View>
@@ -421,11 +430,11 @@ const handleSend = async () => {
 
   if (locationError) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff', padding: 30 }}>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: palette.canvas, padding: 30 }}>
         <Text style={{ fontSize: 40, marginBottom: 15 }}>📍</Text>
         <Text style={{ textAlign: 'center', color: '#666', marginBottom: 20 }}>{locationError}</Text>
         <TouchableOpacity
-          style={{ backgroundColor: '#FF69B4', paddingVertical: 12, paddingHorizontal: 24, borderRadius: 12 }}
+          style={{ backgroundColor: palette.accent, paddingVertical: 12, paddingHorizontal: 24, borderRadius: 12 }}
           onPress={() => checkLocation(currentUser)}
         >
           <Text style={{ color: '#fff', fontWeight: 'bold' }}>Tekrar Dene</Text>
@@ -436,7 +445,7 @@ const handleSend = async () => {
 
   if (!isNearVenue) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff', padding: 30 }}>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: palette.canvas, padding: 30 }}>
         <Text style={{ fontSize: 40, marginBottom: 15 }}>🚫</Text>
         <Text style={{ fontSize: 17, fontWeight: 'bold', color: '#333', marginBottom: 8, textAlign: 'center' }}>
           Bu sohbete katılamazsın
@@ -450,7 +459,7 @@ const handleSend = async () => {
           </Text>
         )}
         <TouchableOpacity
-          style={{ backgroundColor: '#FF69B4', paddingVertical: 12, paddingHorizontal: 24, borderRadius: 12 }}
+          style={{ backgroundColor: palette.accent, paddingVertical: 12, paddingHorizontal: 24, borderRadius: 12 }}
           onPress={() => checkLocation(currentUser)}
         >
           <Text style={{ color: '#fff', fontWeight: 'bold' }}>Konumu Yeniden Kontrol Et</Text>
@@ -462,27 +471,38 @@ const handleSend = async () => {
   // --- Sohbet ekranı (konum doğrulandı) ---
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: '#fff' }}
+      style={{ flex: 1, backgroundColor: palette.canvas }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={80}
     >
-      <View style={{ paddingHorizontal: 15, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F3D9E4', backgroundColor: '#FFF5F7' }}>
+      <View style={{ paddingHorizontal: 15, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F3D9E4', backgroundColor: palette.blush }}>
         <Text style={{ fontWeight: 'bold', color: '#333', fontSize: 15 }}>{item.name} — Anlık Sohbet 💬</Text>
         <Text style={{ color: '#999', fontSize: 11 }}>Sadece şu an mekanda olanlar görebilir ve yazabilir · son {HISTORY_HOURS} saat</Text>
       </View>
 
-      {loadingMessages ? (
-        <ActivityIndicator color="#FF69B4" style={{ marginTop: 30 }} />
+      {messageLoadFailed && (
+        <TouchableOpacity accessibilityRole="button" onPress={fetchMessages}
+          style={{ margin: 12, padding: 12, borderRadius: 12, backgroundColor: palette.blush }}>
+          <Text style={{ color: palette.accentPressed, fontWeight: '700' }}>Mesajlar yüklenemedi. Yeniden dene.</Text>
+        </TouchableOpacity>
+      )}
+      {loadingMessages && messages.length === 0 ? (
+        <View accessibilityLiveRegion="polite" style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+          <ActivityIndicator color={palette.accent} />
+          <Text style={{ color: palette.muted }}>Mesajlar yükleniyor…</Text>
+        </View>
       ) : (
         <FlatList
           ref={flatListRef}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
           data={messages}
           keyExtractor={(msg) => msg.id}
           style={{ flex: 1 }}
           contentContainerStyle={{ padding: 15, paddingBottom: 20 }}
           onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
-          ListEmptyComponent={
-            <Text style={{ textAlign: 'center', color: '#999', marginTop: 30 }}>
+          ListEmptyComponent={messageLoadFailed ? null :
+            <Text style={{ textAlign: 'center', color: palette.muted, marginTop: 30 }}>
               Henüz kimse yazmamış, ilk mesajı sen at! 👋
             </Text>
           }
@@ -500,9 +520,9 @@ const handleSend = async () => {
     <View
       style={{
         alignSelf: isMine ? 'flex-end' : 'flex-start',
-        backgroundColor: isMine ? '#FF69B4' : '#F3F3F3',
-        borderRadius: 14,
-        paddingVertical: 8,
+        backgroundColor: isMine ? palette.roseTint : palette.surface,
+        borderRadius: 17, borderWidth: 1, borderColor: palette.border,
+        paddingVertical: 10,
         paddingHorizontal: 12,
         marginBottom: 8,
         maxWidth: '78%',
@@ -523,7 +543,7 @@ const handleSend = async () => {
 
       <Text
         style={{
-          color: isMine ? '#fff' : '#333',
+          color: palette.ink,
           fontSize: 14,
         }}
       >
@@ -532,7 +552,7 @@ const handleSend = async () => {
 
       <Text
         style={{
-          color: isMine ? '#FFE4E1' : '#999',
+          color: palette.muted,
           fontSize: 10,
           textAlign: 'right',
           marginTop: 4,
@@ -547,7 +567,7 @@ const handleSend = async () => {
       )}
 
       {/* Mesaj Yazma Alanı */}
-      <View style={{ borderTopWidth: 1, borderTopColor: '#F3D9E4', padding: 10 }}>
+      <View style={{ borderTopWidth: 1, borderTopColor: palette.border, backgroundColor: palette.surface, padding: 12 }}>
         <TouchableOpacity
           onPress={() => setSendAnonymous(!sendAnonymous)}
           style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}
@@ -567,19 +587,22 @@ const handleSend = async () => {
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <TextInput
             style={{
-              flex: 1, backgroundColor: '#FAFAFA', borderWidth: 1, borderColor: '#FFE4E1',
+              flex: 1, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border,
               borderRadius: 20, paddingHorizontal: 15, paddingVertical: 10, fontSize: 14,
             }}
-            placeholder="Bir şeyler yaz..."
+            accessibilityLabel="Mesaj"
+            placeholder="Mesajını yaz…"
             value={messageText}
             onChangeText={setMessageText}
             multiline
           />
           <TouchableOpacity
             style={{
-              backgroundColor: '#FF69B4', width: 42, height: 42, borderRadius: 21,
+              backgroundColor: palette.accent, width: 46, height: 46, borderRadius: 23,
               justifyContent: 'center', alignItems: 'center', opacity: isSending ? 0.6 : 1,
             }}
+            accessibilityRole="button"
+            accessibilityLabel="Mesajı gönder"
             onPress={handleSend}
             disabled={isSending}
           >

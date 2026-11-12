@@ -1,3 +1,4 @@
+import { palette } from './theme';
 import React, { useEffect, useState } from 'react';
 import { 
   View, 
@@ -612,7 +613,7 @@ const handleCreateCollection = async () => {
               style={{
                 width: 130,
                 marginRight: 10,
-                backgroundColor: '#FFF0F5',
+                backgroundColor: palette.canvas,
                 borderRadius: 12,
                 overflow: 'hidden',
                 position: 'relative',
@@ -711,7 +712,7 @@ const handleCreateCollection = async () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFF0F5', 
+    backgroundColor: palette.canvas,
     paddingTop: Platform.OS === 'ios' ? 50 : 20,
   },
   headerContainer: {
@@ -727,7 +728,7 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: '#FF69B4',
+    backgroundColor: palette.accent,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -755,10 +756,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#FF69B4',
+    borderColor: palette.accent,
   },
   miniSignOutText: {
-    color: '#FF69B4',
+    color: palette.accent,
     fontSize: 12,
     fontWeight: '600',
   },
@@ -778,7 +779,7 @@ const styles = StyleSheet.create({
   locationInput: {
     height: 40,
     borderBottomWidth: 1,
-    borderBottomColor: '#FFF0F5',
+    borderBottomColor: palette.canvas,
     fontSize: 13,
     color: '#555',
     marginTop: 5,
@@ -823,13 +824,13 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   suggestionBadge: {
-    backgroundColor: '#FFF0F5',
+    backgroundColor: palette.canvas,
     paddingVertical: 6,
     paddingHorizontal: 12,
     borderRadius: 15,
     marginRight: 8,
     borderWidth: 1,
-    borderColor: '#FFE4E1',
+    borderColor: palette.border,
   },
   suggestionText: {
     color: '#DB7093',
@@ -852,7 +853,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   shareButton: {
-    backgroundColor: '#FF69B4',
+    backgroundColor: palette.accent,
     paddingVertical: 8,
     paddingHorizontal: 20,
     borderRadius: 20,
@@ -887,7 +888,7 @@ const styles = StyleSheet.create({
   },
   postUser: {
     fontWeight: 'bold',
-    color: '#FF69B4',
+    color: palette.accent,
     fontSize: 14,
   },
   postTime: {
@@ -907,7 +908,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   locationBadge: {
-    backgroundColor: '#FFF0F5',
+    backgroundColor: palette.canvas,
     alignSelf: 'flex-start',
     paddingVertical: 4,
     paddingHorizontal: 8,
@@ -943,12 +944,12 @@ emptyFavoritesText: {
 
 favoriteCard: {
   width: 145,
-  backgroundColor: '#FFF0F5',
+  backgroundColor: palette.canvas,
   borderRadius: 12,
   marginRight: 10,
   overflow: 'hidden',
   borderWidth: 1,
-  borderColor: '#FFE4E1',
+  borderColor: palette.border,
 },
 
 favoriteImage: {
@@ -995,7 +996,7 @@ collectionInputRow: {
 collectionInput: {
   flex: 1,
   height: 40,
-  backgroundColor: '#FFF0F5',
+  backgroundColor: palette.canvas,
   borderRadius: 10,
   paddingHorizontal: 12,
   color: '#333',
@@ -1006,7 +1007,7 @@ collectionAddButton: {
   width: 40,
   height: 40,
   borderRadius: 20,
-  backgroundColor: '#FF69B4',
+  backgroundColor: palette.accent,
   justifyContent: 'center',
   alignItems: 'center',
   marginLeft: 8,
@@ -1026,12 +1027,12 @@ emptyCollectionsText: {
 
 collectionCard: {
   width: 120,
-  backgroundColor: '#FFF0F5',
+  backgroundColor: palette.canvas,
   borderRadius: 12,
   padding: 12,
   marginRight: 10,
   borderWidth: 1,
-  borderColor: '#FFE4E1',
+  borderColor: palette.border,
 },
 
 collectionIcon: {

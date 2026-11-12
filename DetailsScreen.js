@@ -8,7 +8,6 @@ import {
   Linking, 
   TextInput, 
   ActivityIndicator, 
-  Dimensions,
   useWindowDimensions,
   Alert,
   Platform,
@@ -24,8 +23,9 @@ import MomentFeed from './MomentFeed';
 import MenuPhotoImport from './MenuPhotoImport';
 import VenueAccountPhotos from './VenueAccountPhotos';
 import { getMenuGroup, groupMenuCategories } from './menuGrouping';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { palette } from './theme';
 
-const SCREEN_HEIGHT = Dimensions.get('window').height;
 let presenceSubscriptionSequence = 0;
 
 // Canlı durum için: bu süre içinde tazelenmemiş bir "buradayım" kaydı artık sayılmaz
@@ -50,6 +50,18 @@ const calculateDistance = (lat1, lon1, lat2, lon2) => {
 
   return R * c;
 };
+
+function SectionStatus({ loading, message, onRetry }) {
+  const content = <>
+    {loading && <ActivityIndicator color={palette.accent} />}
+    <Text style={{ color: onRetry ? palette.accentPressed : palette.muted, textAlign: 'center' }}>{message}</Text>
+  </>;
+  const style = { backgroundColor: palette.surface, borderColor: palette.border, borderWidth: 1, borderRadius: 15, padding: 14, marginBottom: 16, alignItems: 'center', gap: 8 };
+
+  return onRetry
+    ? <TouchableOpacity accessibilityRole="button" onPress={onRetry} style={style}>{content}</TouchableOpacity>
+    : <View accessibilityLiveRegion="polite" style={style}>{content}</View>;
+}
 
 export default function DetailsScreen({ route, navigation, guest = false }) {
   const { item } = route.params;
@@ -113,6 +125,7 @@ export default function DetailsScreen({ route, navigation, guest = false }) {
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
   const [reviews, setReviews] = useState([]);
   const [loadingReviews, setLoadingReviews] = useState(true);
+  const [reviewsError, setReviewsError] = useState(false);
 
   // --- Menü ---
   const [menuItems, setMenuItems] = useState([]);
@@ -133,6 +146,7 @@ export default function DetailsScreen({ route, navigation, guest = false }) {
   // --- Fotoğraflar ---
   const [venuePhotos, setVenuePhotos] = useState([]);
   const [loadingPhotos, setLoadingPhotos] = useState(true);
+  const [photosError, setPhotosError] = useState(false);
 
   const [showAddVenuePhotoForm, setShowAddVenuePhotoForm] = useState(false);
   const [newVenuePhotoUrl, setNewVenuePhotoUrl] = useState('');
@@ -507,34 +521,32 @@ await fetchCheckInStatus(authUser.id);
 
   const fetchReviews = async () => {
     setLoadingReviews(true);
-    const { data, error } = await supabase
-      .from('reviews')
-      .select('*')
-      .eq('venue_id', item.id)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.log('Yorum çekme hatası:', error);
-    } else {
+    setReviewsError(false);
+    try {
+      const { data, error } = await supabase.from('reviews').select('*')
+        .eq('venue_id', item.id).order('created_at', { ascending: false });
+      if (error) throw error;
       setReviews(data || []);
+    } catch {
+      setReviewsError(true);
+    } finally {
+      setLoadingReviews(false);
     }
-    setLoadingReviews(false);
   };
 
   const fetchVenuePhotos = async () => {
     setLoadingPhotos(true);
-    const { data, error } = await supabase
-      .from('venue_photos')
-      .select('*')
-      .eq('venue_id', item.id)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.log('Fotoğraf çekme hatası:', error);
-    } else {
+    setPhotosError(false);
+    try {
+      const { data, error } = await supabase.from('venue_photos').select('*')
+        .eq('venue_id', item.id).order('created_at', { ascending: false });
+      if (error) throw error;
       setVenuePhotos(data || []);
+    } catch {
+      setPhotosError(true);
+    } finally {
+      setLoadingPhotos(false);
     }
-    setLoadingPhotos(false);
   };
 
   const officialPhotos = venuePhotos.filter(
@@ -901,7 +913,7 @@ const taggedPhotos = venuePhotos.filter(
           />
           <View style={{ flexDirection: 'row', gap: 10 }}>
             <TouchableOpacity
-              style={{ flex: 1, backgroundColor: '#FF69B4', borderRadius: 8, paddingVertical: 10, alignItems: 'center', opacity: isSavingEdit ? 0.6 : 1 }}
+              style={{ flex: 1, backgroundColor: palette.accent, borderRadius: 8, paddingVertical: 10, alignItems: 'center', opacity: isSavingEdit ? 0.6 : 1 }}
               onPress={handleSaveEditMenuItem}
               disabled={isSavingEdit}
             >
@@ -931,7 +943,7 @@ const taggedPhotos = venuePhotos.filter(
         </View>
 
         {menuItem.price != null && (
-          <Text style={{ fontSize: 15, fontWeight: 'bold', color: '#FF69B4', marginRight: isOwner ? 12 : 0 }}>
+          <Text style={{ fontSize: 15, fontWeight: 'bold', color: palette.accent, marginRight: isOwner ? 12 : 0 }}>
             {menuItem.price} ₺
           </Text>
         )}
@@ -971,7 +983,7 @@ const taggedPhotos = venuePhotos.filter(
         <Text style={{ fontSize: 19, fontWeight: 'bold', color: '#333' }}>Menü 🍽️</Text>
         {isOwner && (
           <TouchableOpacity onPress={() => setShowAddMenuForm(!showAddMenuForm)}>
-            <Text style={{ color: '#FF69B4', fontWeight: 'bold' }}>
+            <Text style={{ color: palette.accent, fontWeight: 'bold' }}>
               {showAddMenuForm ? 'İptal' : '+ Ürün Ekle'}
             </Text>
           </TouchableOpacity>
@@ -1035,13 +1047,11 @@ const taggedPhotos = venuePhotos.filter(
       )}
 
       {loadingMenu ? (
-        <ActivityIndicator color="#FF69B4" style={{ marginVertical: 20 }} />
+        <SectionStatus loading message="Menü yükleniyor…" />
       ) : menuError ? (
-        <TouchableOpacity accessibilityRole="button" onPress={fetchMenuItems}>
-          <Text style={{ color: '#9B1B4D', marginBottom: 20 }}>Menü yüklenemedi. Yeniden dene.</Text>
-        </TouchableOpacity>
+        <SectionStatus message="Menü yüklenemedi. Yeniden dene." onRetry={fetchMenuItems} />
       ) : Object.keys(groupedByCategory).length === 0 ? (
-        <Text style={{ color: '#999', marginBottom: 20 }}>Bu bölümde henüz ürün yok.</Text>
+        <SectionStatus message="Bu bölümde henüz ürün yok." />
       ) : (
         <View style={{ marginBottom: 20 }}>
           {Object.keys(groupedByCategory).sort().map((categoryName) => (
@@ -1059,20 +1069,23 @@ const taggedPhotos = venuePhotos.filter(
   );
 
   return (
-    <ScrollView keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets keyboardDismissMode="on-drag" style={{ height: SCREEN_HEIGHT, backgroundColor: '#fff' }} contentContainerStyle={{ paddingBottom: 40 }}>
+    <SafeAreaView edges={['top', 'left', 'right']} style={{ flex: 1, backgroundColor: palette.canvas }}>
+    <ScrollView keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets keyboardDismissMode="on-drag" style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 36 }}>
       {/* ===== ÜST KISIM ===== */}
       <View>
-        <View style={{ height: 180, backgroundColor: '#FFEAF2' }}>
+        <View style={{ height: item.image_url ? 216 : 106, backgroundColor: palette.roseTint, marginHorizontal: 16, marginTop: 8, borderRadius: 22, overflow: 'hidden' }}>
           {!!item.image_url && <Image source={{ uri: item.image_url }} style={{ width: '100%', height: '100%' }} />}
         </View>
 
         {/* Geri butonu */}
         <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel="Geri"
           onPress={() => navigation.goBack()}
           style={{
-            position: 'absolute', top: 15, left: 15,
+            position: 'absolute', top: 18, left: 26,
             width: 38, height: 38, borderRadius: 19,
-            backgroundColor: 'rgba(0,0,0,0.45)',
+            backgroundColor: palette.accentPressed,
             justifyContent: 'center', alignItems: 'center',
           }}
         >
@@ -1090,7 +1103,7 @@ const taggedPhotos = venuePhotos.filter(
             width: 38,
             height: 38,
             borderRadius: 19,
-            backgroundColor: 'rgba(0,0,0,0.45)',
+            backgroundColor: palette.accentPressed,
             justifyContent: 'center',
             alignItems: 'center',
           }}
@@ -1117,7 +1130,7 @@ const taggedPhotos = venuePhotos.filter(
             position: 'absolute',
             top: 60,
             right: 15,
-            backgroundColor: 'rgba(0,0,0,0.45)',
+            backgroundColor: palette.accentPressed,
             paddingVertical: 8,
             paddingHorizontal: 12,
             borderRadius: 18,
@@ -1196,10 +1209,11 @@ const taggedPhotos = venuePhotos.filter(
       </View>
 
       {/* ===== BAŞLIK BÖLÜMÜ ===== */}
-      <View style={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 8 }}>
+      <View style={{ marginHorizontal: 16, marginTop: 12, marginBottom: 16, padding: 16, borderRadius: 20, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 22, fontWeight: 'bold', color: '#333' }}>{item.name}</Text>
+            <Text accessibilityRole="header" style={{ fontSize: 25, fontWeight: '800', color: palette.ink }}>{item.name}</Text>
+            {!!item.category && <Text style={{ color: palette.accent, fontWeight: '700', fontSize: 12, marginTop: 3 }}>{item.category}</Text>}
             {!!item.location && <Text style={{ color: '#666', fontSize: 13 }}>{item.location}</Text>}
             {!!item.description && <Text style={{ color: '#666', marginTop: 6 }}>{item.description}</Text>}
 
@@ -1222,7 +1236,7 @@ const taggedPhotos = venuePhotos.filter(
   onPress={onRestrictedAction || handleCheckIn}
   disabled={checkingLocation || isCheckedIn}
   style={{
-    backgroundColor: '#FF69B4',
+    backgroundColor: palette.accent,
     paddingVertical: 10,
     paddingHorizontal: 14,
     borderRadius: 12,
@@ -1254,16 +1268,17 @@ const taggedPhotos = venuePhotos.filter(
             <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 12 }}>Yol Tarifi 📍</Text>
           </TouchableOpacity>
         </View>
+        <View style={{ marginTop: 12, alignItems: 'flex-start' }}>
+          <TouchableOpacity accessibilityRole="button" onPress={openChat} style={{ minHeight: 44, justifyContent: 'center', paddingHorizontal: 13, borderRadius: 14, backgroundColor: palette.blush }}><Text style={{ fontWeight: '700', color: palette.accentPressed }}>Sohbet 💬</Text></TouchableOpacity>
+        </View>
       </View>
 
-      <Text style={{ paddingHorizontal: 20, marginBottom: 10, color: '#888' }}>Menüyü ve fotoğrafları yana kaydır</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20, gap: 10, paddingBottom: 15 }}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 8, paddingBottom: 16 }}>
         {[['menu', 'Menü'], ['accountphotos', 'Fotoğraflar'], ['photos', 'Ziyaretçiler'], ['reviews', 'Yorumlar']].map(([key, label]) => (
-          <TouchableOpacity key={key} accessibilityRole="tab" accessibilityState={{ selected: activeMainTab === key }} onPress={() => setActiveMainTab(key)} style={{ padding: 12, borderRadius: 12, backgroundColor: activeMainTab === key ? '#FF69B4' : '#F3F3F3' }}>
-            <Text style={{ fontWeight: '700', color: activeMainTab === key ? '#fff' : '#666' }}>{label}</Text>
+          <TouchableOpacity key={key} accessibilityRole="tab" accessibilityState={{ selected: activeMainTab === key }} onPress={() => setActiveMainTab(key)} style={{ minHeight: 44, justifyContent: 'center', paddingHorizontal: 13, borderRadius: 14, borderWidth: 1, borderColor: palette.border, backgroundColor: activeMainTab === key ? palette.roseTint : palette.surface }}>
+            <Text style={{ fontWeight: '700', color: activeMainTab === key ? palette.accentPressed : palette.muted }}>{label}</Text>
           </TouchableOpacity>
         ))}
-        <TouchableOpacity onPress={openChat} style={{ padding: 12 }}><Text>Sohbet 💬</Text></TouchableOpacity>
       </ScrollView>
 
       {/* ===== İÇERİK ===== */}
@@ -1315,9 +1330,11 @@ const taggedPhotos = venuePhotos.filter(
 
           <Text style={{ fontSize: 19, fontWeight: 'bold', color: '#333', marginBottom: 12 }}>Yorumlar 💬</Text>
           {loadingReviews ? (
-            <ActivityIndicator color="#FF69B4" style={{ marginVertical: 20 }} />
+            <SectionStatus loading message="Yorumlar yükleniyor…" />
+          ) : reviewsError ? (
+            <SectionStatus message="Yorumlar yüklenemedi. Yeniden dene." onRetry={fetchReviews} />
           ) : reviews.length === 0 ? (
-            <Text style={{ color: '#999', marginBottom: 20 }}>Henüz yorum yapılmamış. İlk yorumu sen yaz!</Text>
+            <SectionStatus message="Henüz yorum yapılmamış." />
           ) : (
             <View style={{ marginBottom: 20 }}>
               {reviews.map((review) => (
@@ -1338,7 +1355,7 @@ const taggedPhotos = venuePhotos.filter(
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <Text style={{ fontSize: 19, fontWeight: 'bold', color: '#333' }}>Etiketleyenler 🏷️</Text>
             <TouchableOpacity onPress={onRestrictedAction || (() => setShowAddPhotoForm(!showAddPhotoForm))}>
-              <Text style={{ color: '#FF69B4', fontWeight: 'bold' }}>
+              <Text style={{ color: palette.accent, fontWeight: 'bold' }}>
                 {showAddPhotoForm ? 'İptal' : '+ Fotoğraf Ekle'}
               </Text>
             </TouchableOpacity>
@@ -1387,7 +1404,7 @@ const taggedPhotos = venuePhotos.filter(
               />
               <View style={{ flexDirection: 'row', gap: 10 }}>
                 <TouchableOpacity
-                  style={{ flex: 1, backgroundColor: '#FF69B4', borderRadius: 8, paddingVertical: 10, alignItems: 'center', opacity: isSavingPhotoEdit ? 0.6 : 1 }}
+                  style={{ flex: 1, backgroundColor: palette.accent, borderRadius: 8, paddingVertical: 10, alignItems: 'center', opacity: isSavingPhotoEdit ? 0.6 : 1 }}
                   onPress={handleSaveEditPhoto}
                   disabled={isSavingPhotoEdit}
                 >
@@ -1404,11 +1421,11 @@ const taggedPhotos = venuePhotos.filter(
           )}
 
           {loadingPhotos ? (
-            <ActivityIndicator color="#FF69B4" style={{ marginVertical: 20 }} />
+            <SectionStatus loading message="Fotoğraflar yükleniyor…" />
+          ) : photosError ? (
+            <SectionStatus message="Fotoğraflar yüklenemedi. Yeniden dene." onRetry={fetchVenuePhotos} />
           ) : taggedPhotos.length === 0 ? (
-            <Text style={{ color: '#999', marginBottom: 20 }}>
-              Henüz kimse etiketlememiş.
-            </Text>
+            <SectionStatus message="Henüz kimse etiketlememiş." />
           ) : (
             <View
               style={{
@@ -1477,5 +1494,6 @@ const taggedPhotos = venuePhotos.filter(
         </View>
       )}
     </ScrollView>
+    </SafeAreaView>
   );
 }
