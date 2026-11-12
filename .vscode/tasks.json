@@ -22,7 +22,16 @@
         "kind": "build",
         "isDefault": true
       },
-      "problemMatcher": []
+      "problemMatcher": [],
+      "windows": {
+        "options": {
+          "env": {
+            "EXPO_NO_REDIRECT_PAGE": "1",
+            "ANDROID_HOME": "",
+            "ANDROID_SDK_ROOT": ""
+          }
+        }
+      }
     },
     {
       "label": "Venue: Expo Go (LAN)",
