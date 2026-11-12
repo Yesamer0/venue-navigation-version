@@ -9,14 +9,40 @@
         "./node_modules/expo/bin/cli",
         "start",
         "--go",
-        "--tunnel"
+        "--tunnel",
+        "ngrok"
       ],
       "options": {
-        "cwd": "${workspaceFolder}"
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "EXPO_NO_REDIRECT_PAGE": "1"
+        }
       },
       "group": {
         "kind": "build",
         "isDefault": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Venue: Expo Go (LAN)",
+      "type": "process",
+      "command": "node",
+      "args": [
+        "./node_modules/expo/bin/cli",
+        "start",
+        "--go",
+        "--lan"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "EXPO_NO_REDIRECT_PAGE": "1"
+        }
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": false
       },
       "problemMatcher": []
     },
