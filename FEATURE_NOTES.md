@@ -23,7 +23,7 @@
 - GEMINI_API_KEY stays in Supabase secrets, never in the app. Optional GEMINI_MENU_MODEL defaults to gemini-flash-lite-latest. At most two bounded generation attempts are made; transient failures can use an available stable Flash model from Google's catalog.
 - import-menu has gateway verify_jwt=false with explicit user authorization. Its handler still verifies auth.getUser and business role; owner-scoped SQL RPCs enforce authorization. Error messages distinguish provider quota, model availability, timeouts and saves.
 - PHOTO_CLEANUP_TOKEN stays in Edge secrets and Vault. The existing minute-based cleanup job now ONLY cleans files after author deletion. queue_expired_visitor_photos is intentionally a no-op; do not restore the old expiry behavior. An after-delete trigger queues files. The worker additionally protects any path with a surviving post, and retries failed deletions. File cleanup never drives post deletion.
-- All checked-in migrations, including 20261110130000 and 20261110131000, are applied and recorded on the linked project. Never reapply old standalone lifecycle SQL on top of these migrations.
+- Migrations 20261110130000 and 20261110131000 are applied and recorded on the linked project. Never reapply old standalone lifecycle SQL on top of these migrations.
 - Menus/official gallery/visitor photos are separate records. Menu photo import produces products and does not publish the source image as a social post.
 
 ## Validation
@@ -68,3 +68,17 @@ Foreground presence readiness: user confirmed automatic checkout on leaving with
 
 
 11 Kasım menu stage 2: MenuPhotoImport now reads the photo into an exact add/update/remove preview and only writes products after a separate confirmation. The SQL preview runs the same reconciliation engine inside a rolled-back subtransaction; no menu/archive/import-count writes survive preview. Private per-user tokens expire after 15 minutes, snapshot changes invalidate confirmation, confirmation retries are idempotent. Manual menu writes also acquire the venue lock. Unreadable prices preserve existing values, unrelated product families remain, old variants are explicitly listed. import-menu action=preview deployed with existing explicit JWT/role/owner guards and existing verify_jwt=false authorization retained. Migration 20261111130000 applied/history recorded. Local SQL/UI/edge tests and iOS export (1273 modules) passed. Live temporary JWT/AI fixture: 2 adds, 1 update, 2 old variants removed, zero writes before confirmation, foreign user rejected, owner confirmation saved expected prices, absent dessert retained, repeated confirm and cached photo safe; temporary data cleaned. Existing real demo menu was not changed. Physical iPhone preview/cancel/confirm test remains pending.
+
+## iPhone'da VS Code ile Expo Go
+
+- `C:\venue-app` klasörünü aç. Varsayılan **Ctrl+Shift+B** görevi `Venue: Expo Go (LAN)`.
+- Eski Expo görevini terminalde **Ctrl+C** ile durdur. Yeni görevde `Using Expo Go` satırını kontrol et ve yeni QR kodunu iPhone kamerasıyla okut. `exp+venue-app://` geliştirme derlemesinin bağlantısıdır.
+- Telefon ve bilgisayarı aynı ağa bağla. Kampüs ağı cihazlar arası bağlantıyı engelliyorsa bilgisayarı iPhone'un kişisel erişim noktasına bağla. Tüneli LAN bağlantısı kurulamadığında dene.
+- Önbelleği temizleyerek yeniden denemek için VS Code PowerShell terminalinde `node .\node_modules\expo\bin\cli start --go --lan --clear` çalıştır. Paket uyumluluğunu `node .\node_modules\expo\bin\cli install --check` ile kontrol et.
+- QR veya Metro bağlantısı hatalarını açılış aşamasında incele. Supabase erişim hatalarını uygulama açıldıktan sonra ilgili işlem ve log üzerinden doğrula.
+
+## Supabase tablo yetkileri
+
+- Yeni tablolarda gereken rol bazlı `GRANT`'ları ve RLS politikalarını aynı migration'da tanımla. Yetkileri tabloya erişen uygulama ve arka plan rolleriyle doğrula.
+- 12 Kasım'da arka plan loglarında görülen `venue_moments` 42501 hatası, canlıda `service_role` için SELECT, INSERT, UPDATE ve DELETE verilince durdu. `20261112120000_venue_moments_service_role_privileges` aynı yetkileri kaynak kontrolünde kayıt altına alır.
+- `menu_change_preview` migration'ı `venue_moments` tablosuna dokunmuyor. Eksik yetkinin ilk kaynağı doğrulanmadı.
