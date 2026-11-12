@@ -36,8 +36,8 @@ export default function DemoCafeButton({ navigation }) {
   if (profile?.is_venue !== true || profile.username?.trim().toLowerCase() !== 'mekancı') return null;
   return <View style={{ padding: 16 }}>
     <TouchableOpacity accessibilityRole="button" disabled={busy} onPress={open}>
-      <Text style={{ color: '#666', marginTop: 6 }}>Deneme kafesi güncel konumunda açılır.</Text>
+      <Text style={{ color: '#9B1B4D', fontWeight: '700' }}>{busy ? 'Deneme kafesi açılıyor…' : 'Deneme kafesini aç'}</Text>
     </TouchableOpacity>
-    <Text style={{ color: '#666', marginTop: 6 }}>Mekan hesabı kafeyi güncel konumunda hazırlar. Gezgin hesabı aynı kafeyi ziyaret eder ve check-in yapabilir. Ziyaretçilerde gezgin kareleri pembe, mekan paylaşımları mavidir; mekan sahibi en fazla 3 kendi fotoğrafını sabitler.</Text>
+    <Text style={{ color: '#666', marginTop: 6 }}>Deneme kafesi güncel konumunda açılır.</Text>
   </View>;
 }

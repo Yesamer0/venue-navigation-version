@@ -59,6 +59,7 @@ const calculateDistance = (lat1, lon1, lat2, lon2) => {
 
 export default function HomeScreen({ navigation, guest = false, onSignIn }) {
   const [venues, setVenues] = useState([]);
+  const [publicDemoMenuId, setPublicDemoMenuId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const venuesRequestRef = useRef(0);
@@ -85,6 +86,13 @@ export default function HomeScreen({ navigation, guest = false, onSignIn }) {
   useFocusEffect(useCallback(() => {
     fetchVenues();
     fetchRatings();
+    let active = true;
+    const loadDemoMenu = async () => {
+      const { data, error } = await supabase.rpc('get_public_demo_menu');
+      if (active && !error) setPublicDemoMenuId(data);
+    };
+    void loadDemoMenu().catch(() => {});
+    return () => { active = false; };
   }, []));
 
   const fetchVenues = async () => {
@@ -327,6 +335,18 @@ export default function HomeScreen({ navigation, guest = false, onSignIn }) {
           <Text style={{ color: '#9B1B4D', fontWeight: '700' }}>Giriş yap / Kayıt ol</Text>
         </TouchableOpacity>
       ) : <DemoCafeButton navigation={navigation} />}
+      {publicDemoMenuId && (
+        <TouchableOpacity
+          accessibilityRole="button"
+          style={{ padding: 16 }}
+          onPress={() => navigation.navigate('Details', {
+            item: { id: publicDemoMenuId, name: 'Deneme Kafesi' },
+            menuOnly: true,
+          })}
+        >
+          <Text style={{ color: '#9B1B4D', fontWeight: '700' }}>Deneme kafesinin menüsünü gör</Text>
+        </TouchableOpacity>
+      )}
       <View style={localStyles.searchSection}>
         <View style={localStyles.searchBar}>
           <Text style={localStyles.searchIcon}>⌕</Text>

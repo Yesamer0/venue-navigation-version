@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   View, 
   Text, 
-  ScrollView, 
+  ScrollView,
+  SafeAreaView,
   Image, 
   TouchableOpacity, 
   Linking, 
@@ -51,6 +52,7 @@ const calculateDistance = (lat1, lon1, lat2, lon2) => {
 
 export default function DetailsScreen({ route, navigation, guest = false }) {
   const { item } = route.params;
+  const menuOnly = guest || route.params.menuOnly === true;
   const { width: pageWidth } = useWindowDimensions();
   const accountPager = useRef(null);
 
@@ -131,7 +133,7 @@ export default function DetailsScreen({ route, navigation, guest = false }) {
 
   useEffect(() => {
     fetchMenuItems();
-    if (guest) return;
+    if (menuOnly) return;
     loadCurrentUser();
     fetchReviews();
     fetchVenuePhotos();
@@ -153,7 +155,7 @@ export default function DetailsScreen({ route, navigation, guest = false }) {
       active = false;
       void supabase.removeChannel(channel).catch(error => console.log('Canlı durum aboneliği kapatılamadı:', error));
     };
-  }, [item.id, guest]);
+  }, [item.id, menuOnly]);
 
   const loadCurrentUser = async () => {
     try {
@@ -446,7 +448,7 @@ await fetchCheckInStatus(authUser.id);
 
   // Navigation only refreshes presentation; the root owns foreground GPS tracking.
   useFocusEffect(useCallback(() => {
-    if (guest) return;
+    if (menuOnly) return;
     let active = true;
     const refresh = async () => {
       if (!active) return;
@@ -457,7 +459,7 @@ await fetchCheckInStatus(authUser.id);
     void refresh().catch(() => {});
     const timer = setInterval(() => { void refresh().catch(() => {}); }, 30000);
     return () => { active = false; clearInterval(timer); };
-  }, [item.id, guest]));
+  }, [item.id, menuOnly]));
 
   const fetchMenuItems = async () => {
     setLoadingMenu(true);
@@ -925,7 +927,7 @@ const taggedPhotos = venuePhotos.filter(
   };
 
   const menuContent = (
-    <View style={{ width: guest ? undefined : pageWidth, paddingHorizontal: 20 }}>
+    <View style={{ width: menuOnly ? undefined : pageWidth, paddingHorizontal: 20 }}>
 
       <View style={{ flexDirection: 'row', gap: 10, marginBottom: 15 }}>
         {item.has_wifi && (
@@ -1032,14 +1034,21 @@ const taggedPhotos = venuePhotos.filter(
     </View>
   );
 
-  if (guest) return (
-    <ScrollView style={{ flex: 1, backgroundColor: '#fff' }}>
-      <View style={{ padding: 20 }}>
-        <Text style={{ fontSize: 22, fontWeight: 'bold', color: '#333' }}>{item.name}</Text>
-        {!!item.location && <Text style={{ color: '#666' }}>{item.location}</Text>}
-      </View>
-      {menuContent}
-    </ScrollView>
+  if (menuOnly) return (
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
+      <ScrollView>
+        {!guest && (
+          <TouchableOpacity accessibilityRole="button" onPress={() => navigation.goBack()} style={{ padding: 20 }}>
+            <Text style={{ color: '#9B1B4D' }}>‹ Geri</Text>
+          </TouchableOpacity>
+        )}
+        <View style={{ padding: 20 }}>
+          <Text style={{ fontSize: 22, fontWeight: 'bold', color: '#333' }}>{item.name}</Text>
+          {!!item.location && <Text style={{ color: '#666' }}>{item.location}</Text>}
+        </View>
+        {menuContent}
+      </ScrollView>
+    </SafeAreaView>
   );
 
   return (
