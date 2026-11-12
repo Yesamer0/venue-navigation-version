@@ -9,6 +9,7 @@ import * as Notifications from 'expo-notifications';
 
 // Screens
 import AuthScreen from './AuthScreen';
+import PasswordRecoveryScreen from './PasswordRecoveryScreen';
 import MainTabs from './MainTabs';
 import HomeStack from './HomeStack';
 import { AuthProvider, useAuth } from './AuthProvider';
@@ -44,6 +45,7 @@ function RootNavigator() {
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       {session && profile ? <Stack.Screen name="Main" component={MainTabs} navigationKey={session.user.id} /> : <>
         <Stack.Screen name="Auth" component={AuthScreen} />
+        <Stack.Screen name="PasswordRecovery" component={PasswordRecoveryScreen} />
         <Stack.Screen name="Guest">{props => <HomeStack {...props} guest />}</Stack.Screen>
       </>}
     </Stack.Navigator>

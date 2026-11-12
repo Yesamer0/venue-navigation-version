@@ -15,3 +15,16 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     lock: processLock,
   },
 });
+
+// Keep the recovery session separate from the app's signed-in session.
+export function createRecoveryClient() {
+  return createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      storageKey: 'venue-password-recovery',
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+      lock: processLock,
+    },
+  });
+}

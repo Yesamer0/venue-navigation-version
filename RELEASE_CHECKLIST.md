@@ -83,9 +83,15 @@ Verified auth implementation commit: 5cc2e69e40c49a4160e78de3fc1e25bb56c604db on
 ## 12 Kasım durum güncellemesi
 
 - Kullanıcı menü önizlemesini ve misafir kafe sayfasının son hâlini onayladı.
-- İşletme fotoğraf paylaşımına Kamera ve Galeriden seç seçenekleri eklendi. Kamera, yeni galeri görünümü ve üç fotoğraf sabitleme sınırı için iPhone doğrulaması bekliyor. Aktif check-in ile hesaptan çıkış düzeltmesinin iPhone tekrarı da bekliyor.
+- İşletme fotoğraf paylaşımına Kamera ve Galeriden seç seçenekleri eklendi. Kullanıcı iPhone’da kamerayı, fotoğraf çerçeve renklerini ve sabitlemeyi doğruladı. Yeni galeri görünümü için ayrıca doğrulama bekliyor. Aktif check-in ile hesaptan çıkış düzeltmesinin iPhone tekrarı da bekliyor.
 
 ### 13 Kasım'da telefonda denenecekler
 
 - [ ] Uzaklaşma ve yeniden check-in. Konumu olan bir mekânda check-in yap. Uygulama açıkken mekândan uzaklaşınca check-in'in otomatik kapandığını ve daha önce paylaştığın fotoğrafın kaldığını kontrol et. Geri dönünce yeniden check-in yap.
 - [ ] İki telefonda yorum ve beğeni. Ayrı Venue hesaplarıyla aynı normal kafenin Ziyaretçiler sekmesinde aynı gezgin fotoğrafını aç. Bir telefondan beğen ve test yorumu yaz. Diğer telefonda yenileyip yorum ile beğeni sayısını kontrol et. Beğeniyi geri al ve test yorumunu sil, ardından diğer telefonda tekrar doğrula.
+
+### 4. bölüm, şifre sıfırlama
+
+- Giriş ekranına Şifremi unuttum eklendi. Kurtarma kodu normal oturumdan ayrı, diske kaydedilmeyen bir oturumda doğrulanır. Canlı geçici hesapla kodun tek kullanımlık olduğu, yeni şifrenin çalıştığı ve eski şifrenin reddedildiği doğrulandı.
+- Canlı Auth için kurtarma şablonu repoda `supabase/templates/password_recovery.html` dosyasında. Varsayılan Supabase SMTP yalnızca proje ekibine e-posta teslim eder. Genel kullanıcıların şifre sıfırlaması için özel SMTP ayarlanmalı ve gerçek e-posta teslimi denenmeli.
+- Hesap silme ve kapsamlı yetki denetimi bekliyor. Eski profil parola alanı için yalnızca satır sayısı ve şema bağımlılıkları kontrol edildi.

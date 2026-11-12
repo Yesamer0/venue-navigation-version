@@ -115,6 +115,11 @@ export default function AuthScreen({ navigation }) {
           {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>{isRegisterMode ? 'Kayıt Ol' : 'Giriş Yap'}</Text>}
         </TouchableOpacity>
 
+        {!isRegisterMode && (
+          <TouchableOpacity disabled={loading} onPress={() => navigation.navigate('PasswordRecovery', { email: email.trim() })} style={styles.switchButton}>
+            <Text style={styles.switchText}>Şifremi unuttum</Text>
+          </TouchableOpacity>
+        )}
         <TouchableOpacity disabled={loading} onPress={() => { setIsRegisterMode(!isRegisterMode); setFormError(''); }} style={styles.switchButton}>
           <Text style={styles.switchText}>
             {isRegisterMode ? 'Zaten hesabınız var mı? Giriş Yapın' : 'Hesabınız yok mu? Kayıt Olun'}
