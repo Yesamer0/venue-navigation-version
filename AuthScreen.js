@@ -120,6 +120,9 @@ export default function AuthScreen({ navigation }) {
             {isRegisterMode ? 'Zaten hesabınız var mı? Giriş Yapın' : 'Hesabınız yok mu? Kayıt Olun'}
           </Text>
         </TouchableOpacity>
+        <TouchableOpacity disabled={loading} onPress={() => navigation.navigate('Guest')} style={styles.switchButton}>
+          <Text style={styles.switchText}>Misafir olarak menülere göz at</Text>
+        </TouchableOpacity>
       </View>
       </ScrollView>
     </KeyboardAvoidingView>

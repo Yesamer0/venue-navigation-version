@@ -57,7 +57,7 @@ const calculateDistance = (lat1, lon1, lat2, lon2) => {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 };
 
-export default function HomeScreen({ navigation }) {
+export default function HomeScreen({ navigation, guest = false, onSignIn }) {
   const [venues, setVenues] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -322,7 +322,11 @@ export default function HomeScreen({ navigation }) {
         </Text>
       </View>
 
-      <DemoCafeButton navigation={navigation} />
+      {guest ? (
+        <TouchableOpacity accessibilityRole="button" onPress={onSignIn} style={{ padding: 16 }}>
+          <Text style={{ color: '#9B1B4D', fontWeight: '700' }}>Giriş yap / Kayıt ol</Text>
+        </TouchableOpacity>
+      ) : <DemoCafeButton navigation={navigation} />}
       <View style={localStyles.searchSection}>
         <View style={localStyles.searchBar}>
           <Text style={localStyles.searchIcon}>⌕</Text>

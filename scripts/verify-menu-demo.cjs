@@ -14,11 +14,37 @@ const render=(allowed=true)=>{hook=0;return Menu({venueId:'venue',canManage:allo
  for(const camera of [false,true]){slots=[];let tree=render();await buttons(tree)[camera?1:0].props.onPress();tree=render();assert.equal(nodes(tree).filter(n=>n.type==='Image').length,1);assert.equal(calls,camera?1:0);await buttons(tree)[0].props.onPress();tree=render();assert.equal(nodes(tree).filter(n=>n.type==='Image').length,1);assert.equal(saved,camera?1:0);await buttons(tree)[0].props.onPress();tree=render();assert.equal(nodes(tree).filter(n=>n.type==='Image').length,0);}
  assert.equal(calls,2);assert.equal(converted,2);assert.equal(refreshed,2);
  slots=[];await buttons(render())[0].props.onPress();mode='error';await buttons(render())[0].props.onPress();let tree=render();assert.equal(nodes(tree).filter(n=>n.type==='Image').length,1);assert.ok(nodes(tree).some(n=>n.children.includes('Servis zaman asimi')));mode='success';await buttons(tree)[0].props.onPress();assert.equal(nodes(render()).filter(n=>n.type==='Image').length,1);await buttons(render())[0].props.onPress();assert.equal(nodes(render()).filter(n=>n.type==='Image').length,0);
- let business=false,gps=0,inserts=0,updates=0,cafe=null,opened=[];
- const demoApi={auth:api.auth,rpc:async()=>({data:{id:'shared-business-cafe',name:'deneme'}}),from:table=>{const q={select:()=>q,eq:()=>q,order:()=>q,limit:()=>q,maybeSingle:async()=>({data:table==='users'?{is_venue:business}:cafe}),insert:row=>{inserts++;cafe={...row,id:'owner-cafe'};return q;},update:row=>{updates++;cafe={...cafe,...row};return q;},single:async()=>({data:cafe})};return q;}};
- const Demo=load('DemoCafeButton.js',{react,'react-native':native,'./supabase':{supabase:demoApi},'./deviceLocation':{getFreshLocation:async()=>{gps++;return {coords:{latitude:37,longitude:28}};}}}).default;
- slots=[];hook=0;let demo=Demo({navigation:{navigate:(screen,{item})=>opened.push(item)}});
- await buttons(demo)[0].props.onPress();assert.equal(opened[0].id,'shared-business-cafe');assert.equal(inserts,0);assert.equal(gps,0);
- business=true;slots=[];hook=0;demo=Demo({navigation:{navigate:(screen,{item})=>opened.push(item)}});await buttons(demo)[0].props.onPress();await buttons(demo)[0].props.onPress();assert.equal(inserts,1);assert.equal(updates,1);assert.equal(gps,2);assert.equal(cafe.name,'deneme');
- console.log('PASS: traveler importer hidden; gallery/camera photo -> read-only change preview -> separate confirmation save; JPEG preparation; real server error preserved; failed photo retry; success refresh');
+ let profile, allowed=false, gps=0, inserts=0, updates=0, cafe=null;
+ const opened=[];
+ const demoApi={
+  auth:api.auth,
+  rpc:async name=>{assert.equal(name,'can_use_demo_cafe');return {data:allowed};},
+  from:table=>{
+   assert.equal(table,'venues');
+   const q={select:()=>q,eq:()=>q,order:()=>q,limit:()=>q,maybeSingle:async()=>({data:cafe}),
+    insert:row=>{inserts++;cafe={...row,id:'owner-cafe'};return q;},
+    update:row=>{updates++;cafe={...cafe,...row};return q;},single:async()=>({data:cafe})};
+   return q;
+  },
+ };
+ const Demo=load('DemoCafeButton.js',{
+  react,'react-native':native,'./supabase':{supabase:demoApi},
+  './AuthProvider':{useAuth:()=>({profile})},
+  './deviceLocation':{getFreshLocation:async()=>{gps++;return {coords:{latitude:37,longitude:28}};}},
+ }).default;
+ const renderDemo=()=>{slots=[];hook=0;return Demo({navigation:{navigate:(screen,{item})=>opened.push(item)}});};
+ for(const account of [null,{is_venue:false,username:'gezgin'},{is_venue:true,username:'sahip'}]){
+  profile=account;
+  assert.equal(renderDemo(),null);
+ }
+ profile={is_venue:true,username:'mekancı'};
+ const demo=renderDemo();
+ await buttons(demo)[0].props.onPress();
+ assert.equal(gps,0);assert.equal(inserts,0);assert.equal(opened.length,0);
+ allowed=true;
+ await buttons(demo)[0].props.onPress();
+ await buttons(demo)[0].props.onPress();
+ assert.equal(inserts,1);assert.equal(updates,1);assert.equal(gps,2);assert.equal(cafe.name,'deneme');
+ assert.equal(opened.length,2);
+ console.log('PASS: traveler importer hidden; gallery/camera photo -> read-only change preview -> separate confirmation save; JPEG preparation; real server error preserved; failed photo retry; success refresh; demo cafe restricted to its designated owner');
 })().catch(e=>{console.error(e);process.exitCode=1;});

@@ -49,7 +49,7 @@ const calculateDistance = (lat1, lon1, lat2, lon2) => {
   return R * c;
 };
 
-export default function DetailsScreen({ route, navigation }) {
+export default function DetailsScreen({ route, navigation, guest = false }) {
   const { item } = route.params;
   const { width: pageWidth } = useWindowDimensions();
   const accountPager = useRef(null);
@@ -97,6 +97,7 @@ export default function DetailsScreen({ route, navigation }) {
   // --- Menü ---
   const [menuItems, setMenuItems] = useState([]);
   const [loadingMenu, setLoadingMenu] = useState(true);
+  const [menuError, setMenuError] = useState(false);
   const [showAddMenuForm, setShowAddMenuForm] = useState(false);
   const [newMenuName, setNewMenuName] = useState('');
   const [newMenuPrice, setNewMenuPrice] = useState('');
@@ -129,8 +130,9 @@ export default function DetailsScreen({ route, navigation }) {
   const [isSavingPhotoEdit, setIsSavingPhotoEdit] = useState(false);
 
   useEffect(() => {
-    loadCurrentUser();
     fetchMenuItems();
+    if (guest) return;
+    loadCurrentUser();
     fetchReviews();
     fetchVenuePhotos();
     fetchLiveCount();
@@ -151,7 +153,7 @@ export default function DetailsScreen({ route, navigation }) {
       active = false;
       void supabase.removeChannel(channel).catch(error => console.log('Canlı durum aboneliği kapatılamadı:', error));
     };
-  }, [item.id]);
+  }, [item.id, guest]);
 
   const loadCurrentUser = async () => {
     try {
@@ -444,6 +446,7 @@ await fetchCheckInStatus(authUser.id);
 
   // Navigation only refreshes presentation; the root owns foreground GPS tracking.
   useFocusEffect(useCallback(() => {
+    if (guest) return;
     let active = true;
     const refresh = async () => {
       if (!active) return;
@@ -454,18 +457,19 @@ await fetchCheckInStatus(authUser.id);
     void refresh().catch(() => {});
     const timer = setInterval(() => { void refresh().catch(() => {}); }, 30000);
     return () => { active = false; clearInterval(timer); };
-  }, [item.id]));
+  }, [item.id, guest]));
 
   const fetchMenuItems = async () => {
     setLoadingMenu(true);
+    setMenuError(false);
     const { data, error } = await supabase
       .from('menu_items')
-      .select('*')
+      .select('id,name,description,price,category,menu_group')
       .eq('venue_id', item.id)
       .order('category', { ascending: true });
 
     if (error) {
-      console.log('Menü çekme hatası:', error);
+      setMenuError(true);
       setLoadingMenu(false);
       return false;
     } else {
@@ -920,6 +924,124 @@ const taggedPhotos = venuePhotos.filter(
     );
   };
 
+  const menuContent = (
+    <View style={{ width: guest ? undefined : pageWidth, paddingHorizontal: 20 }}>
+
+      <View style={{ flexDirection: 'row', gap: 10, marginBottom: 15 }}>
+        {item.has_wifi && (
+          <View style={{ backgroundColor: '#F0F9FF', padding: 8, borderRadius: 12, borderWidth: 1, borderColor: '#BAE6FD' }}>
+            <Text style={{ color: '#0369A1', fontWeight: 'bold', fontSize: 12 }}>📶 Wi-Fi</Text>
+          </View>
+        )}
+        {item.is_outdoor && (
+          <View style={{ backgroundColor: '#F0FDF4', padding: 8, borderRadius: 12, borderWidth: 1, borderColor: '#BBF7D0' }}>
+            <Text style={{ color: '#15803D', fontWeight: 'bold', fontSize: 12 }}>🌳 Açık Alan</Text>
+          </View>
+        )}
+      </View>
+
+      {isOwner && <MenuPhotoImport venueId={item.id} canManage={isOwner} onImported={fetchMenuItems} />}
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+        <Text style={{ fontSize: 19, fontWeight: 'bold', color: '#333' }}>Menü 🍽️</Text>
+        {isOwner && (
+          <TouchableOpacity onPress={() => setShowAddMenuForm(!showAddMenuForm)}>
+            <Text style={{ color: '#FF69B4', fontWeight: 'bold' }}>
+              {showAddMenuForm ? 'İptal' : '+ Ürün Ekle'}
+            </Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      <View style={{ flexDirection: 'row', gap: 8, marginBottom: 15 }}>
+        {[
+          { key: 'yiyecek', label: '🍰 Yiyecek' },
+          { key: 'icecek', label: '☕ İçecek' },
+          { key: 'diger', label: '📦 Diğer' },
+        ].map((tab) => (
+          <TouchableOpacity
+            key={tab.key}
+            onPress={() => setActiveMenuGroup(tab.key)}
+            style={{
+              paddingVertical: 7,
+              paddingHorizontal: 14,
+              borderRadius: 16,
+              backgroundColor: activeMenuGroup === tab.key ? '#FFF0F5' : '#FAFAFA',
+              borderWidth: 1,
+              borderColor: activeMenuGroup === tab.key ? '#FF69B4' : '#EEEEEE',
+            }}
+          >
+            <Text style={{ color: activeMenuGroup === tab.key ? '#DB7093' : '#888', fontWeight: '600', fontSize: 13 }}>
+              {tab.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {isOwner && showAddMenuForm && (
+        <View style={{ backgroundColor: '#FFF5F7', borderRadius: 16, padding: 15, marginBottom: 15, borderWidth: 1, borderColor: '#FCE7F3' }}>
+          <TextInput
+            style={{ backgroundColor: '#fff', borderRadius: 10, padding: 10, marginBottom: 10, borderWidth: 1, borderColor: '#F9A8D4' }}
+            placeholder="Ürün adı (örn: Latte)"
+            value={newMenuName}
+            onChangeText={setNewMenuName}
+          />
+          <TextInput
+            style={{ backgroundColor: '#fff', borderRadius: 10, padding: 10, marginBottom: 10, borderWidth: 1, borderColor: '#F9A8D4' }}
+            placeholder="Fiyat (örn: 120)"
+            keyboardType="numeric"
+            value={newMenuPrice}
+            onChangeText={setNewMenuPrice}
+          />
+          <TextInput
+            style={{ backgroundColor: '#fff', borderRadius: 10, padding: 10, marginBottom: 10, borderWidth: 1, borderColor: '#F9A8D4' }}
+            placeholder="Kategori (örn: Sıcak Kahveler)"
+            value={newMenuCategory}
+            onChangeText={setNewMenuCategory}
+          />
+          <TouchableOpacity
+            style={[styles.allButton, { opacity: isSubmittingMenu ? 0.6 : 1, alignItems: 'center' }]}
+            onPress={handleAddMenuItem}
+            disabled={isSubmittingMenu}
+          >
+            {isSubmittingMenu ? <ActivityIndicator color="#fff" /> : <Text style={styles.allButtonText}>Menüye Ekle</Text>}
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {loadingMenu ? (
+        <ActivityIndicator color="#FF69B4" style={{ marginVertical: 20 }} />
+      ) : menuError ? (
+        <TouchableOpacity accessibilityRole="button" onPress={fetchMenuItems}>
+          <Text style={{ color: '#9B1B4D', marginBottom: 20 }}>Menü yüklenemedi. Yeniden dene.</Text>
+        </TouchableOpacity>
+      ) : Object.keys(groupedByCategory).length === 0 ? (
+        <Text style={{ color: '#999', marginBottom: 20 }}>Bu bölümde henüz ürün yok.</Text>
+      ) : (
+        <View style={{ marginBottom: 20 }}>
+          {Object.keys(groupedByCategory).sort().map((categoryName) => (
+            <View key={categoryName} style={{ marginBottom: 18 }}>
+              <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#DB7093', marginBottom: 6, textTransform: 'uppercase' }}>
+                {categoryName}
+              </Text>
+              {groupedByCategory[categoryName].map((menuItem) => renderMenuItemRow(menuItem))}
+            </View>
+          ))}
+        </View>
+      )}
+
+    </View>
+  );
+
+  if (guest) return (
+    <ScrollView style={{ flex: 1, backgroundColor: '#fff' }}>
+      <View style={{ padding: 20 }}>
+        <Text style={{ fontSize: 22, fontWeight: 'bold', color: '#333' }}>{item.name}</Text>
+        {!!item.location && <Text style={{ color: '#666' }}>{item.location}</Text>}
+      </View>
+      {menuContent}
+    </ScrollView>
+  );
+
   return (
     <ScrollView keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets keyboardDismissMode="on-drag" style={{ height: SCREEN_HEIGHT, backgroundColor: '#fff' }} contentContainerStyle={{ paddingBottom: 40 }}>
       {/* ===== ÜST KISIM ===== */}
@@ -1125,107 +1247,7 @@ const taggedPhotos = venuePhotos.filter(
       {activeMainTab === 'photos' && <MomentFeed venueId={item.id} navigation={navigation} layout="grid" isVenueOwner={isOwner} />}
       {activeMainTab === 'photos' ? null : (activeMainTab === 'menu' || activeMainTab === 'accountphotos') ? (
         <ScrollView ref={accountPager} scrollEnabled={activeMainTab === 'menu'} keyboardShouldPersistTaps="handled" horizontal pagingEnabled directionalLockEnabled showsHorizontalScrollIndicator={false} contentOffset={{ x: activeMainTab === 'accountphotos' ? pageWidth : 0, y: 0 }} onMomentumScrollEnd={event => setActiveMainTab(Math.round(event.nativeEvent.contentOffset.x / pageWidth) === 0 ? 'menu' : 'accountphotos')}>
-        <View style={{ width: pageWidth, paddingHorizontal: 20 }}>
-
-          <View style={{ flexDirection: 'row', gap: 10, marginBottom: 15 }}>
-            {item.has_wifi && (
-              <View style={{ backgroundColor: '#F0F9FF', padding: 8, borderRadius: 12, borderWidth: 1, borderColor: '#BAE6FD' }}>
-                <Text style={{ color: '#0369A1', fontWeight: 'bold', fontSize: 12 }}>📶 Wi-Fi</Text>
-              </View>
-            )}
-            {item.is_outdoor && (
-              <View style={{ backgroundColor: '#F0FDF4', padding: 8, borderRadius: 12, borderWidth: 1, borderColor: '#BBF7D0' }}>
-                <Text style={{ color: '#15803D', fontWeight: 'bold', fontSize: 12 }}>🌳 Açık Alan</Text>
-              </View>
-            )}
-          </View>
-
-          {isOwner && <MenuPhotoImport venueId={item.id} canManage={isOwner} onImported={fetchMenuItems} />}
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-            <Text style={{ fontSize: 19, fontWeight: 'bold', color: '#333' }}>Menü 🍽️</Text>
-            {isOwner && (
-              <TouchableOpacity onPress={() => setShowAddMenuForm(!showAddMenuForm)}>
-                <Text style={{ color: '#FF69B4', fontWeight: 'bold' }}>
-                  {showAddMenuForm ? 'İptal' : '+ Ürün Ekle'}
-                </Text>
-              </TouchableOpacity>
-            )}
-          </View>
-
-          <View style={{ flexDirection: 'row', gap: 8, marginBottom: 15 }}>
-            {[
-              { key: 'yiyecek', label: '🍰 Yiyecek' },
-              { key: 'icecek', label: '☕ İçecek' },
-              { key: 'diger', label: '📦 Diğer' },
-            ].map((tab) => (
-              <TouchableOpacity
-                key={tab.key}
-                onPress={() => setActiveMenuGroup(tab.key)}
-                style={{
-                  paddingVertical: 7,
-                  paddingHorizontal: 14,
-                  borderRadius: 16,
-                  backgroundColor: activeMenuGroup === tab.key ? '#FFF0F5' : '#FAFAFA',
-                  borderWidth: 1,
-                  borderColor: activeMenuGroup === tab.key ? '#FF69B4' : '#EEEEEE',
-                }}
-              >
-                <Text style={{ color: activeMenuGroup === tab.key ? '#DB7093' : '#888', fontWeight: '600', fontSize: 13 }}>
-                  {tab.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {isOwner && showAddMenuForm && (
-            <View style={{ backgroundColor: '#FFF5F7', borderRadius: 16, padding: 15, marginBottom: 15, borderWidth: 1, borderColor: '#FCE7F3' }}>
-              <TextInput
-                style={{ backgroundColor: '#fff', borderRadius: 10, padding: 10, marginBottom: 10, borderWidth: 1, borderColor: '#F9A8D4' }}
-                placeholder="Ürün adı (örn: Latte)"
-                value={newMenuName}
-                onChangeText={setNewMenuName}
-              />
-              <TextInput
-                style={{ backgroundColor: '#fff', borderRadius: 10, padding: 10, marginBottom: 10, borderWidth: 1, borderColor: '#F9A8D4' }}
-                placeholder="Fiyat (örn: 120)"
-                keyboardType="numeric"
-                value={newMenuPrice}
-                onChangeText={setNewMenuPrice}
-              />
-              <TextInput
-                style={{ backgroundColor: '#fff', borderRadius: 10, padding: 10, marginBottom: 10, borderWidth: 1, borderColor: '#F9A8D4' }}
-                placeholder="Kategori (örn: Sıcak Kahveler)"
-                value={newMenuCategory}
-                onChangeText={setNewMenuCategory}
-              />
-              <TouchableOpacity
-                style={[styles.allButton, { opacity: isSubmittingMenu ? 0.6 : 1, alignItems: 'center' }]}
-                onPress={handleAddMenuItem}
-                disabled={isSubmittingMenu}
-              >
-                {isSubmittingMenu ? <ActivityIndicator color="#fff" /> : <Text style={styles.allButtonText}>Menüye Ekle</Text>}
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {loadingMenu ? (
-            <ActivityIndicator color="#FF69B4" style={{ marginVertical: 20 }} />
-          ) : Object.keys(groupedByCategory).length === 0 ? (
-            <Text style={{ color: '#999', marginBottom: 20 }}>Bu bölümde henüz ürün yok.</Text>
-          ) : (
-            <View style={{ marginBottom: 20 }}>
-              {Object.keys(groupedByCategory).sort().map((categoryName) => (
-                <View key={categoryName} style={{ marginBottom: 18 }}>
-                  <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#DB7093', marginBottom: 6, textTransform: 'uppercase' }}>
-                    {categoryName}
-                  </Text>
-                  {groupedByCategory[categoryName].map((menuItem) => renderMenuItemRow(menuItem))}
-                </View>
-              ))}
-            </View>
-          )}
-
-        </View>
+        {menuContent}
         <View style={{ width: pageWidth }}><VenueAccountPhotos venue={item} isOwner={isOwner} active={activeMainTab === 'accountphotos'} legacyPhotos={officialPhotos} onDeleteLegacy={handleDeletePhoto} />
           {activeMainTab === 'accountphotos' && <VenueMoments venue={item} isCheckedIn={isCheckedIn} navigation={navigation} canPublish={!isVenueAccount} showFeed feedLayout="gallery" onShowPhotos={() => setActiveMainTab('accountphotos')} />}
         </View>
