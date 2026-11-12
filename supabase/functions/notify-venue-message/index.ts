@@ -153,6 +153,7 @@ Deno.serve(async (request: Request) => {
       title: 'Venue',
       body: 'Bulunduğun mekânda yeni bir mesaj var!',
       sound: 'default',
+      channelId: 'venue-messages',
       data: {
         type: 'venue_message',
         venue_id: message.venue_id,
@@ -188,8 +189,15 @@ Deno.serve(async (request: Request) => {
 
       const expoResult = await expoResponse.json();
 
-      console.log('Expo push result:', expoResult);
-      submitted += batch.length;
+      const tickets = Array.isArray(expoResult.data) ? expoResult.data : [];
+      const staleTokens = tickets.flatMap((ticket, index) =>
+        ticket?.details?.error === 'DeviceNotRegistered' && batch[index] ? [batch[index].to] : [],
+      );
+      if (staleTokens.length) {
+        const { error: cleanupError } = await admin.from('push_tokens').delete().in('token', staleTokens);
+        if (cleanupError) console.error('Could not remove unregistered push tokens:', cleanupError.code);
+      }
+      submitted += tickets.filter((ticket) => ticket?.status === 'ok').length;
     }
 
     return Response.json({

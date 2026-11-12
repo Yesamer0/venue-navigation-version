@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { unregisterPushNotificationsAsync } from './pushNotifications';
 
 export function authErrorMessage(error) {
   const code = error?.code;
@@ -25,6 +26,11 @@ export function validateAuthInput({ username, email, password, registering }) {
 export async function signOutVenue() {
   const { data: { user } } = await supabase.auth.getUser();
   if (user) {
+    try {
+      await unregisterPushNotificationsAsync(user.id);
+    } catch {
+      throw new Error('Bu cihazın bildirimleri kapatılamadı. İnternetini kontrol edip tekrar dene.');
+    }
     // Signing out must not leave the user visibly checked in after leaving the app.
     const { error } = await supabase.from('venue_presence').delete().eq('user_id', user.id);
     if (error) throw new Error('Çıkış tamamlanamadı. İnternetini kontrol edip tekrar dene.');

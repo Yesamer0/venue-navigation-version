@@ -1,13 +1,15 @@
 {
   "expo": {
-    "name": "venue-app",
+    "name": "Venue",
     "slug": "venue-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.yesamer.venue",
+      "buildNumber": "1"
     },
     "android": {
       "adaptiveIcon": {
@@ -21,7 +23,27 @@
     },
     "plugins": [
       "expo-font",
-      "expo-status-bar"
-    ]
+      "expo-status-bar",
+      [
+        "expo-notifications",
+        {
+          "defaultChannel": "venue-messages"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Venue, mekân ve menü fotoğraflarını seçebilmen için fotoğraf arşivine erişir.",
+          "cameraPermission": "Venue, mekân ve menü fotoğraflarını çekebilmen için kamerayı kullanır.",
+          "microphonePermission": false
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "9dad2380-e21b-421f-a371-50965686f50b"
+      }
+    },
+    "owner": "yesamer"
   }
 }
