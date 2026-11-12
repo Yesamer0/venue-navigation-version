@@ -1,5 +1,5 @@
 import React, { useCallback, useRef, useState } from 'react';
-import { View, Text, Image, TouchableOpacity, TextInput, ActivityIndicator, Alert, Modal, ScrollView } from 'react-native';
+import { View, Text, Image, TouchableOpacity, TextInput, ActivityIndicator, Alert, Modal, Platform, ScrollView } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { supabase } from './supabase';
@@ -20,14 +20,37 @@ export default function VenueAccountPhotos({ venue, isOwner, legacyPhotos = [], 
     else { setPhotos(data || []); setError(''); }
   }, [venue.id]);
   useFocusEffect(useCallback(() => { if (active) load(); }, [load, active]));
-  const pick = async () => {
+  const pick = async (camera = false) => {
     if (lock.current) return;
     lock.current = true; setBusy(true);
     try {
-      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], base64: true, quality: 0.85, exif: false });
-      if (!result.canceled) { decodePhoto(result.assets[0].base64); setSelected(result.assets[0]); }
+      if (camera) {
+        const permission = await ImagePicker.requestCameraPermissionsAsync();
+        if (!permission.granted) {
+          throw new Error('Fotoğraf çekmek için Ayarlar’dan kamera izni ver.');
+        }
+      }
+      const options = { mediaTypes: ['images'], base64: true, quality: 0.85, exif: false };
+      const result = camera ? await ImagePicker.launchCameraAsync(options) : await ImagePicker.launchImageLibraryAsync(options);
+      const asset = result.assets?.[0];
+      if (!result.canceled && asset) {
+        decodePhoto(asset.base64);
+        setSelected(asset);
+      }
     } catch (e) { Alert.alert('Fotoğraf seçilemedi', e.message); }
     finally { lock.current = false; setBusy(false); }
+  };
+  const choosePhotoSource = () => {
+    if (lock.current || selected || !isOwner) return;
+    if (Platform.OS === 'web') {
+      pick();
+      return;
+    }
+    Alert.alert('Fotoğraf paylaş', 'Fotoğrafı nereden eklemek istersin?', [
+      { text: 'Kamera', onPress: () => pick(true) },
+      { text: 'Galeriden seç', onPress: () => pick() },
+      { text: 'Vazgeç', style: 'cancel' },
+    ]);
   };
   const publish = async () => {
     if (lock.current || !selected) return;
@@ -78,7 +101,7 @@ export default function VenueAccountPhotos({ venue, isOwner, legacyPhotos = [], 
     <Text style={{ fontSize: 19, fontWeight: '700', marginBottom: 12 }}>Mekanın Fotoğrafları</Text>
     <TouchableOpacity onPress={load} accessibilityLabel="Fotoğrafları yenile"><Text style={{ color: '#9B1B4D', paddingVertical: 8 }}>Yenile</Text></TouchableOpacity>
     {isOwner && <Text style={{ color: '#777', marginVertical: 8 }}>Kendi fotoğraflarından en fazla 3 tanesini sabitleyebilirsin. Gezgin fotoğraflarını yalnızca paylaşan gezgin silebilir.</Text>}
-    {isOwner && <TouchableOpacity disabled={busy || !!selected} onPress={pick}><Text style={{ color: '#AD285D', paddingVertical: 12 }}>+ Fotoğraf paylaş</Text></TouchableOpacity>}
+    {isOwner && <TouchableOpacity disabled={busy || !!selected} onPress={choosePhotoSource}><Text style={{ color: '#AD285D', paddingVertical: 12 }}>+ Fotoğraf paylaş</Text></TouchableOpacity>}
     {selected && <View>
       <Image source={{ uri: selected.uri }} style={{ width: '100%', height: 220, borderRadius: 12 }} />
       <TextInput accessibilityLabel="Fotoğraf açıklaması" placeholder="Bir açıklama yaz…" maxLength={500} value={caption} onChangeText={setCaption} editable={!busy} style={{ padding: 12 }} />
