@@ -83,7 +83,7 @@ Verified auth implementation commit: 5cc2e69e40c49a4160e78de3fc1e25bb56c604db on
 ## 12 Kasım durum güncellemesi
 
 - Kullanıcı menü önizlemesini ve misafir kafe sayfasının son hâlini onayladı.
-- İşletme fotoğraf paylaşımına Kamera ve Galeriden seç seçenekleri eklendi. Kullanıcı iPhone’da kamerayı, fotoğraf çerçeve renklerini ve sabitlemeyi doğruladı. Yeni galeri görünümü için ayrıca doğrulama bekliyor. Aktif check-in ile hesaptan çıkış düzeltmesinin iPhone tekrarı da bekliyor.
+- İşletme fotoğraf paylaşımına Kamera ve Galeriden seç seçenekleri eklendi. Kullanıcı iPhone’da kamerayı, fotoğraf çerçeve renklerini ve sabitlemeyi doğruladı. Yeni galeri görünümü için ayrıca doğrulama bekliyor. Kullanıcı iPhone testinde hesaptan çıkınca aktif check-in kaydının temizlendiğini doğruladı.
 
 ### 13 Kasım'da telefonda denenecekler
 
