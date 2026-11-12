@@ -106,3 +106,11 @@ Verified auth implementation commit: 5cc2e69e40c49a4160e78de3fc1e25bb56c604db on
 
 - Keşfet, kafe, sohbet, profil ve hesap ekranlarında ortak soft pembe palet. Mekân fotoğrafı varsa geniş kartta gösterilir. Harita ve filtreler başlangıçta kapalıdır, ilgili düğmelerle açılır.
 - Menü, yorum, fotoğraf ve sohbet yükleme/hata durumları güncellendi. iOS ve web paketi derlendi. Keşfet ve kafe ekranları mobil tarayıcıda 390 ve 320 piksel genişlikte kontrol edildi. Fiziksel iPhone'da klavye ve uzun liste kontrolü bekliyor.
+
+### 12 Kasım, iPhone arayüz doğrulaması
+
+- [x] Keşfet araması, kategori, filtreler ve haritayı gösterme.
+- [x] Kafe sekmeleri, uzun menü kaydırması, yatay fotoğraf galerisi ve ekrana sığma.
+- [x] Misafir kafe görünümü ve Sohbet düğmesindeki giriş uyarısı.
+- [x] Yorum alanı ve gönder düğmesinin klavye açıkken görünmesi.
+- [x] Bağlantı kesildiğinde fotoğraf yenileme ve bağlantı dönünce yeniden deneme.
