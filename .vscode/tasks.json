@@ -2,14 +2,14 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "Venue: Web",
+      "label": "Venue: Expo Go",
       "type": "process",
       "command": "node",
       "args": [
         "./node_modules/expo/bin/cli",
         "start",
-        "--web",
-        "--lan"
+        "--go",
+        "--tunnel"
       ],
       "options": {
         "cwd": "${workspaceFolder}"
@@ -21,13 +21,13 @@
       "problemMatcher": []
     },
     {
-      "label": "Venue: Expo Go",
+      "label": "Venue: Web",
       "type": "process",
       "command": "node",
       "args": [
         "./node_modules/expo/bin/cli",
         "start",
-        "--go",
+        "--web",
         "--lan"
       ],
       "options": {
