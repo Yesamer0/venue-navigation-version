@@ -1,5 +1,5 @@
 import React, { useCallback, useRef, useState } from 'react';
-import { Image, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
@@ -19,7 +19,17 @@ function CampaignButton({ children, onPress, disabled }) {
   );
 }
 
-export default function VenueCampaign({ venueId, canManage, manageExisting = false, venueName }) {
+function isValidDate(value) {
+  if (!/^[1-9]\d{3}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(value + 'T00:00:00Z');
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
+export default function VenueCampaign({
+  venueId, canManage, manageExisting = false, venueName, onClose, onSaved, refreshVersion,
+}) {
+  const cardEditor = Boolean(onClose);
+  const managesSchedule = canManage && (manageExisting || cardEditor);
   const [campaign, setCampaign] = useState(null);
   const [loadState, setLoadState] = useState('loading');
   const [retry, setRetry] = useState(0);
@@ -28,6 +38,8 @@ export default function VenueCampaign({ venueId, canManage, manageExisting = fal
   const [confirmRemoval, setConfirmRemoval] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [startsOn, setStartsOn] = useState('');
+  const [endsOn, setEndsOn] = useState('');
   const [photoDraft, setPhotoDraft] = useState(undefined);
   const [picking, setPicking] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -35,34 +47,43 @@ export default function VenueCampaign({ venueId, canManage, manageExisting = fal
   const submitting = useRef(false);
   const revision = useRef(0);
 
+  const openEditor = useCallback((current) => {
+    setTitle(current?.title ?? '');
+    setDescription(current?.description ?? '');
+    setStartsOn(current?.starts_on ?? '');
+    setEndsOn(current?.ends_on ?? '');
+    setPhotoDraft(undefined);
+    setSaveError('');
+    setConfirmRemoval(false);
+    setEditing(true);
+  }, []);
+
   useFocusEffect(useCallback(() => {
     let active = true;
-    const loadRevision = revision.current;
     const load = async () => {
-      setLoadState('loading');
+      const loadRevision = revision.current;
       try {
-        const { data, error } = await supabase.rpc('get_venue_campaign', { p_venue_id: String(venueId) });
+        const { data, error } = await supabase.rpc('get_venue_campaign', {
+          p_venue_id: String(venueId), p_manage: managesSchedule,
+        });
         if (error) throw error;
         if (active && loadRevision === revision.current) {
           setCampaign(data);
           setLoadState('ready');
+          if (cardEditor) openEditor(data);
         }
       } catch {
         if (active && loadRevision === revision.current) setLoadState('error');
       }
     };
+    setLoadState('loading');
     void load();
-    return () => { active = false; };
-  }, [venueId, retry]));
-
-  const openEditor = () => {
-    setTitle(campaign?.title ?? '');
-    setDescription(campaign?.description ?? '');
-    setPhotoDraft(undefined);
-    setSaveError('');
-    setConfirmRemoval(false);
-    setEditing(true);
-  };
+    const timer = !canManage ? setInterval(load, 30_000) : null;
+    return () => {
+      active = false;
+      if (timer !== null) clearInterval(timer);
+    };
+  }, [venueId, retry, managesSchedule, cardEditor, openEditor, canManage, refreshVersion]));
 
   const pickPhoto = async () => {
     setPicking(true);
@@ -101,6 +122,10 @@ export default function VenueCampaign({ venueId, canManage, manageExisting = fal
       setSaveError('Başlık ve kampanya açıklamasını yaz.');
       return;
     }
+    if (!remove && (!isValidDate(startsOn) || !isValidDate(endsOn) || startsOn > endsOn)) {
+      setSaveError('Geçerli bir başlangıç ve bitiş tarihi gir (YYYY-AA-GG).');
+      return;
+    }
 
     submitting.current = true;
     setSaving(true);
@@ -112,7 +137,9 @@ export default function VenueCampaign({ venueId, canManage, manageExisting = fal
         p_description: remove ? null : nextDescription,
         p_photo_base64: photoDraft ?? null,
         p_replace_photo: photoDraft !== undefined,
-        p_existing_only: manageExisting,
+        p_existing_only: manageExisting || Boolean(campaign),
+        p_starts_on: remove ? null : startsOn,
+        p_ends_on: remove ? null : endsOn,
       });
       if (error) throw error;
       revision.current += 1;
@@ -121,6 +148,8 @@ export default function VenueCampaign({ venueId, canManage, manageExisting = fal
       setEditing(false);
       setExpanded(false);
       setConfirmRemoval(false);
+      onSaved?.();
+      onClose?.();
     } catch {
       setSaveError(remove ? 'Kampanya silinemedi. Tekrar dene.' : 'Kampanya kaydedilemedi. Tekrar dene.');
     } finally {
@@ -132,11 +161,19 @@ export default function VenueCampaign({ venueId, canManage, manageExisting = fal
   const busy = saving || picking;
   const previewPhoto = photoDraft === undefined ? campaign?.photo_base64 : photoDraft;
   const photoSource = photo => ({ uri: `data:image/jpeg;base64,${photo}` });
+  const range = campaign?.starts_on
+    ? [campaign.starts_on, campaign.ends_on].map(date => date.split('-').reverse().join('.')).join(' – ')
+    : 'Tarih belirtilmedi';
 
   return (
     <>
-      {manageExisting && campaign && <Text style={styles.venueName}>{venueName}</Text>}
-      {campaign && (
+      {cardEditor && !editing && (
+        <View style={styles.actions}>
+          {loadState === 'loading' && <ActivityIndicator color={palette.accent} />}
+          <CampaignButton onPress={onClose}>Vazgeç</CampaignButton>
+        </View>
+      )}
+      {!cardEditor && campaign && (
         <TouchableOpacity
           accessibilityRole="button"
           accessibilityState={{ expanded }}
@@ -147,26 +184,28 @@ export default function VenueCampaign({ venueId, canManage, manageExisting = fal
             <Image source={photoSource(campaign.photo_base64)} style={styles.thumbnail} />
           ) : <Text style={styles.icon} accessible={false}>%</Text>}
           <View style={styles.copy}>
+            {manageExisting && <Text style={styles.venueName}>{venueName}</Text>}
             <Text style={styles.title} numberOfLines={expanded ? undefined : 1}>{campaign.title}</Text>
-            <Text style={styles.description} numberOfLines={expanded ? undefined : 2}>
-              {campaign.description}
-            </Text>
+            {manageExisting
+              ? <Text style={styles.description}>{range}</Text>
+              : <Text style={styles.description} numberOfLines={expanded ? undefined : 2}>{campaign.description}</Text>}
+            {manageExisting && expanded && <Text style={styles.description}>{campaign.description}</Text>}
           </View>
           <Text style={styles.action} accessible={false}>{expanded ? '−' : '+'}</Text>
         </TouchableOpacity>
       )}
-      {loadState === 'error' && (
+      {loadState === 'error' && (canManage || !campaign) && (
         <CampaignButton onPress={() => setRetry(value => value + 1)}>
           Kampanya yüklenemedi · Tekrar dene
         </CampaignButton>
       )}
-      {canManage && loadState === 'ready' && !editing && !confirmRemoval && (campaign || !manageExisting) && (
+      {manageExisting && expanded && canManage && campaign && loadState === 'ready' && !editing && !confirmRemoval && (
         <View style={styles.actions}>
-          <CampaignButton onPress={openEditor}>{campaign ? 'Düzenle' : '+ Kampanya oluştur'}</CampaignButton>
-          {campaign && <CampaignButton onPress={() => {
+          <CampaignButton onPress={() => openEditor(campaign)}>Düzenle</CampaignButton>
+          <CampaignButton onPress={() => {
             setSaveError('');
             setConfirmRemoval(true);
-          }}>Sil</CampaignButton>}
+          }}>Sil</CampaignButton>
         </View>
       )}
       {canManage && confirmRemoval && (
@@ -203,6 +242,27 @@ export default function VenueCampaign({ venueId, canManage, manageExisting = fal
             multiline
             style={[styles.input, styles.multiline]}
           />
+          <View style={styles.dates}>
+            {[
+              ['Başlangıç tarihi', startsOn, setStartsOn],
+              ['Bitiş tarihi', endsOn, setEndsOn],
+            ].map(([label, value, setValue]) => (
+              <View key={label} style={styles.copy}>
+                <Text style={styles.description}>{label}</Text>
+                <TextInput
+                  accessibilityLabel={label}
+                  placeholder="YYYY-AA-GG"
+                  placeholderTextColor={palette.muted}
+                  autoCorrect={false}
+                  maxLength={10}
+                  value={value}
+                  onChangeText={setValue}
+                  editable={!busy}
+                  style={styles.input}
+                />
+              </View>
+            ))}
+          </View>
           {!!previewPhoto && <Image source={photoSource(previewPhoto)} style={styles.preview} />}
           <View style={styles.actions}>
             <CampaignButton disabled={busy} onPress={pickPhoto}>
@@ -215,7 +275,7 @@ export default function VenueCampaign({ venueId, canManage, manageExisting = fal
             <CampaignButton disabled={busy} onPress={() => save()}>
               {saving ? 'Kaydediliyor…' : campaign || manageExisting ? 'Kaydet' : 'Yayınla'}
             </CampaignButton>
-            <CampaignButton disabled={busy} onPress={() => setEditing(false)}>Vazgeç</CampaignButton>
+            <CampaignButton disabled={busy} onPress={onClose || (() => setEditing(false))}>Vazgeç</CampaignButton>
           </View>
         </View>
       )}
@@ -251,4 +311,5 @@ const styles = StyleSheet.create({
   },
   multiline: { minHeight: 64, textAlignVertical: 'top' },
   actions: { flexDirection: 'row', flexWrap: 'wrap' },
+  dates: { flexDirection: 'row', gap: 8 },
 });

@@ -979,7 +979,7 @@ const taggedPhotos = venuePhotos.filter(
         )}
       </View>
 
-      <VenueCampaign key={item.id} venueId={item.id} canManage={isOwner && !readOnly} />
+      <VenueCampaign key={item.id} venueId={item.id} />
       {isOwner && <MenuPhotoImport venueId={item.id} canManage={isOwner} onImported={fetchMenuItems} />}
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
         <Text style={{ fontSize: 19, fontWeight: 'bold', color: '#333' }}>Menü 🍽️</Text>

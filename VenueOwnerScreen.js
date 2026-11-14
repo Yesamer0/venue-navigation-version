@@ -21,6 +21,8 @@ export default function VenueOwnerScreen({ navigation }) {
   // Mekan sahibinin kendi mekanları
   const [myVenues, setMyVenues] = useState([]);
   const [loadingVenues, setLoadingVenues] = useState(true);
+  const [announcementVenueId, setAnnouncementVenueId] = useState(null);
+  const [announcementRevision, setAnnouncementRevision] = useState(0);
   
   useFocusEffect(useCallback(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -319,6 +321,23 @@ const addGalleryPhoto = async (venue) => {
     Mekanın Herkese Açık Sayfası
   </Text>
 </TouchableOpacity>
+<TouchableOpacity
+  accessibilityRole="button"
+  accessibilityState={{ expanded: announcementVenueId === venue.id }}
+  style={[styles.manageButton, { marginTop: 7 }]}
+  onPress={() => setAnnouncementVenueId(current => current === venue.id ? null : venue.id)}
+>
+  <Text style={styles.manageButtonText}>Duyuru oluştur</Text>
+</TouchableOpacity>
+              {announcementVenueId === venue.id && (
+                <VenueCampaign
+                  venueId={venue.id}
+                  venueName={venue.name}
+                  canManage
+                  onClose={() => setAnnouncementVenueId(null)}
+                  onSaved={() => setAnnouncementRevision(value => value + 1)}
+                />
+              )}
             </View>
           ))}
         </View>
@@ -327,7 +346,14 @@ const addGalleryPhoto = async (venue) => {
       <Text style={styles.sectionTitle}>Duyurular</Text>
       <View style={styles.feedList}>
         {myVenues.map(venue => (
-          <VenueCampaign key={venue.id} venueId={venue.id} canManage manageExisting venueName={venue.name} />
+          <VenueCampaign
+            key={venue.id}
+            venueId={venue.id}
+            canManage
+            manageExisting
+            venueName={venue.name}
+            refreshVersion={announcementRevision}
+          />
         ))}
       </View>
       </ScrollView>
