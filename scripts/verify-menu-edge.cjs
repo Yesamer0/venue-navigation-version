@@ -5,7 +5,7 @@ const ctx=vm.createContext({Response,Uint8Array,TextDecoder,AbortSignal,Error,co
  createClient:()=>({auth:{getUser:async()=>({data:{user:{id:'owner'}}})},
  from:()=>{const q={select:()=>q,eq:()=>q,maybeSingle:async()=>({data:{is_venue:role}})};return q;},
  rpc:async(name,args)=>{calls.push({name,args});return {data:name==='prepare_venue_menu_preview'?{previewId:'approved-later',changes:{added:[],updated:[],removed:[]},count:1}:name.startsWith('reserve')?reserved:3};}}),
- fetch:async(url,options)=>{if(url.includes('/models?'))return Response.json({models:[{name:'models/gemini-3.5-flash-lite',supportedGenerationMethods:['generateContent']}]});fetches++;const b=JSON.parse(options.body);assert.equal(b.contents[0].parts[1].inlineData.mimeType,'image/jpeg');
+ fetch:async(url,options)=>{if(url.includes('/models?'))return Response.json({models:[{name:'models/gemini-3.5-flash-lite',supportedGenerationMethods:['generateContent']}]});fetches++;const b=JSON.parse(options.body);assert.equal(b.contents[0].parts[1].inlineData.mimeType,payload.mimeType);
   if(mode==='busy'&&fetches===1)return Response.json({}, {status:503});
   if(mode==='timeout'){const e=new Error('test timeout');e.name='TimeoutError';throw e;}
   if(mode==='quota')return Response.json({}, {status:429});
@@ -26,5 +26,10 @@ function reset(next='ok'){role=true;mode=next;fetches=0;calls=[];reserved=-1;}
  reset('truncated');assert.equal((await request()).status,422);assert.equal(calls.at(-1).name,'release_failed_menu_import');
  reset();reserved=3;assert.equal((await request()).status,200);assert.equal(fetches,0);assert.equal(calls.length,1);
  reset();payload.action='preview';const preview=await (await request()).json();assert.equal(preview.previewId,'approved-later');assert.ok(calls.some(c=>c.name==='prepare_venue_menu_preview'));assert.ok(!calls.some(c=>c.name==='commit_venue_menu_import'));assert.equal(calls.at(-1).name,'release_failed_menu_import');delete payload.action;
+ reset();payload.action='preview';payload.mimeType='application/pdf';
+ assert.equal((await request()).status,400);assert.equal(fetches,0);assert.equal(calls.length,0);
+ payload.image=Buffer.from('%PDF-1.7\n').toString('base64');
+ assert.equal((await (await request()).json()).previewId,'approved-later');
+ assert.equal(fetches,1);assert.ok(!calls.some(c=>c.name==='commit_venue_menu_import'));
  console.log('PASS: traveler blocked before AI; successful owner commit; 503 fallback; timeout/quota/truncation release retry; cached import');
 })().catch(e=>{console.error(e);process.exitCode=1;});
