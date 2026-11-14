@@ -1,6 +1,8 @@
 import React, { useCallback, useRef, useState } from 'react';
-import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Image, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import * as ImagePicker from 'expo-image-picker';
+import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { supabase } from './supabase';
 import { palette } from './theme';
 
@@ -17,7 +19,7 @@ function CampaignButton({ children, onPress, disabled }) {
   );
 }
 
-export default function VenueCampaign({ venueId, canManage }) {
+export default function VenueCampaign({ venueId, canManage, manageExisting = false, venueName }) {
   const [campaign, setCampaign] = useState(null);
   const [loadState, setLoadState] = useState('loading');
   const [retry, setRetry] = useState(0);
@@ -26,6 +28,8 @@ export default function VenueCampaign({ venueId, canManage }) {
   const [confirmRemoval, setConfirmRemoval] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [photoDraft, setPhotoDraft] = useState(undefined);
+  const [picking, setPicking] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
   const submitting = useRef(false);
@@ -54,13 +58,43 @@ export default function VenueCampaign({ venueId, canManage }) {
   const openEditor = () => {
     setTitle(campaign?.title ?? '');
     setDescription(campaign?.description ?? '');
+    setPhotoDraft(undefined);
     setSaveError('');
     setConfirmRemoval(false);
     setEditing(true);
   };
 
+  const pickPhoto = async () => {
+    setPicking(true);
+    setSaveError('');
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'] });
+      if (result.canceled) return;
+      const asset = result.assets[0];
+      const context = ImageManipulator.manipulate(asset.uri);
+      try {
+        context.resize(asset.width >= asset.height ? { width: 420 } : { height: 420 });
+        const image = await context.renderAsync();
+        try {
+          const jpeg = await image.saveAsync({ format: SaveFormat.JPEG, compress: 0.65, base64: true });
+          if (Platform.OS === 'web') URL.revokeObjectURL(jpeg.uri);
+          if (!jpeg.base64 || jpeg.base64.length > 131072) throw new Error('Invalid photo size');
+          setPhotoDraft(jpeg.base64);
+        } finally {
+          image.release();
+        }
+      } finally {
+        context.release();
+      }
+    } catch {
+      setSaveError('Fotoğraf hazırlanamadı. Başka bir fotoğraf seç.');
+    } finally {
+      setPicking(false);
+    }
+  };
+
   const save = async (remove = false) => {
-    if (submitting.current || !canManage) return;
+    if (submitting.current || picking || !canManage) return;
     const nextTitle = title.trim();
     const nextDescription = description.trim();
     if (!remove && (!nextTitle || !nextDescription)) {
@@ -76,6 +110,9 @@ export default function VenueCampaign({ venueId, canManage }) {
         p_venue_id: String(venueId),
         p_title: remove ? null : nextTitle,
         p_description: remove ? null : nextDescription,
+        p_photo_base64: photoDraft ?? null,
+        p_replace_photo: photoDraft !== undefined,
+        p_existing_only: manageExisting,
       });
       if (error) throw error;
       revision.current += 1;
@@ -85,15 +122,20 @@ export default function VenueCampaign({ venueId, canManage }) {
       setExpanded(false);
       setConfirmRemoval(false);
     } catch {
-      setSaveError('Kampanya kaydedilemedi. Tekrar dene.');
+      setSaveError(remove ? 'Kampanya silinemedi. Tekrar dene.' : 'Kampanya kaydedilemedi. Tekrar dene.');
     } finally {
       submitting.current = false;
       setSaving(false);
     }
   };
 
+  const busy = saving || picking;
+  const previewPhoto = photoDraft === undefined ? campaign?.photo_base64 : photoDraft;
+  const photoSource = photo => ({ uri: `data:image/jpeg;base64,${photo}` });
+
   return (
     <>
+      {manageExisting && campaign && <Text style={styles.venueName}>{venueName}</Text>}
       {campaign && (
         <TouchableOpacity
           accessibilityRole="button"
@@ -101,7 +143,9 @@ export default function VenueCampaign({ venueId, canManage }) {
           onPress={() => setExpanded(value => !value)}
           style={styles.banner}
         >
-          <Text style={styles.icon} accessible={false}>%</Text>
+          {campaign.photo_base64 ? (
+            <Image source={photoSource(campaign.photo_base64)} style={styles.thumbnail} />
+          ) : <Text style={styles.icon} accessible={false}>%</Text>}
           <View style={styles.copy}>
             <Text style={styles.title} numberOfLines={expanded ? undefined : 1}>{campaign.title}</Text>
             <Text style={styles.description} numberOfLines={expanded ? undefined : 2}>
@@ -116,14 +160,28 @@ export default function VenueCampaign({ venueId, canManage }) {
           Kampanya yüklenemedi · Tekrar dene
         </CampaignButton>
       )}
-      {canManage && loadState === 'ready' && !editing && (
-        <CampaignButton onPress={openEditor}>
-          {campaign ? 'Kampanyayı düzenle' : '+ Kampanya oluştur'}
-        </CampaignButton>
+      {canManage && loadState === 'ready' && !editing && !confirmRemoval && (campaign || !manageExisting) && (
+        <View style={styles.actions}>
+          <CampaignButton onPress={openEditor}>{campaign ? 'Düzenle' : '+ Kampanya oluştur'}</CampaignButton>
+          {campaign && <CampaignButton onPress={() => {
+            setSaveError('');
+            setConfirmRemoval(true);
+          }}>Sil</CampaignButton>}
+        </View>
+      )}
+      {canManage && confirmRemoval && (
+        <View style={styles.editor}>
+          <Text style={styles.description}>{venueName ? `${venueName} kampanyası silinsin mi?` : 'Kampanya kafe sayfasından silinsin mi?'}</Text>
+          {!!saveError && <Text accessibilityLiveRegion="polite" style={styles.action}>{saveError}</Text>}
+          <View style={styles.actions}>
+            <CampaignButton disabled={busy} onPress={() => save(true)}>{saving ? 'Siliniyor…' : 'Sil'}</CampaignButton>
+            <CampaignButton disabled={busy} onPress={() => setConfirmRemoval(false)}>Vazgeç</CampaignButton>
+          </View>
+        </View>
       )}
       {canManage && editing && (
         <View style={styles.editor}>
-          <Text style={styles.title}>{campaign ? 'Kampanyayı düzenle' : 'Kampanya oluştur'}</Text>
+          <Text style={styles.title}>{campaign || manageExisting ? 'Kampanyayı düzenle' : 'Kampanya oluştur'}</Text>
           <TextInput
             accessibilityLabel="Kampanya başlığı"
             placeholder="Kampanya başlığı"
@@ -131,7 +189,7 @@ export default function VenueCampaign({ venueId, canManage }) {
             maxLength={60}
             value={title}
             onChangeText={setTitle}
-            editable={!saving}
+            editable={!busy}
             style={styles.input}
           />
           <TextInput
@@ -141,29 +199,23 @@ export default function VenueCampaign({ venueId, canManage }) {
             maxLength={180}
             value={description}
             onChangeText={setDescription}
-            editable={!saving}
+            editable={!busy}
             multiline
             style={[styles.input, styles.multiline]}
           />
-          {!!saveError && <Text accessibilityLiveRegion="polite" style={styles.action}>{saveError}</Text>}
-          {confirmRemoval && <Text style={styles.description}>Kampanya kafe sayfasından kaldırılsın mı?</Text>}
+          {!!previewPhoto && <Image source={photoSource(previewPhoto)} style={styles.preview} />}
           <View style={styles.actions}>
-            {confirmRemoval ? (
-              <CampaignButton disabled={saving} onPress={() => save(true)}>{saving ? 'Kaldırılıyor…' : 'Kaldır'}</CampaignButton>
-            ) : (
-              <CampaignButton disabled={saving} onPress={() => save()}>{saving ? 'Kaydediliyor…' : 'Yayınla'}</CampaignButton>
-            )}
-            <CampaignButton disabled={saving} onPress={() => {
-              if (confirmRemoval) setConfirmRemoval(false);
-              else setEditing(false);
-              setSaveError('');
-            }}>Vazgeç</CampaignButton>
-            {campaign && !confirmRemoval && (
-              <CampaignButton disabled={saving} onPress={() => {
-                setSaveError('');
-                setConfirmRemoval(true);
-              }}>Kampanyayı kaldır</CampaignButton>
-            )}
+            <CampaignButton disabled={busy} onPress={pickPhoto}>
+              {picking ? 'Fotoğraf hazırlanıyor…' : previewPhoto ? 'Fotoğrafı değiştir' : 'Fotoğraf ekle'}
+            </CampaignButton>
+            {!!previewPhoto && <CampaignButton disabled={busy} onPress={() => setPhotoDraft(null)}>Fotoğrafı kaldır</CampaignButton>}
+          </View>
+          {!!saveError && <Text accessibilityLiveRegion="polite" style={styles.action}>{saveError}</Text>}
+          <View style={styles.actions}>
+            <CampaignButton disabled={busy} onPress={() => save()}>
+              {saving ? 'Kaydediliyor…' : campaign || manageExisting ? 'Kaydet' : 'Yayınla'}
+            </CampaignButton>
+            <CampaignButton disabled={busy} onPress={() => setEditing(false)}>Vazgeç</CampaignButton>
           </View>
         </View>
       )}
@@ -181,6 +233,9 @@ const styles = StyleSheet.create({
     borderRadius: 10, paddingHorizontal: 9, paddingVertical: 5,
   },
   copy: { flex: 1 },
+  thumbnail: { width: 48, height: 48, borderRadius: 9 },
+  preview: { width: 130, height: 96, borderRadius: 9 },
+  venueName: { color: palette.accentPressed, fontWeight: '700', marginBottom: 5 },
   title: { color: palette.ink, fontWeight: '800', fontSize: 15 },
   description: { color: palette.muted, fontSize: 13 },
   action: { color: palette.accentPressed, fontWeight: '700', fontSize: 13 },

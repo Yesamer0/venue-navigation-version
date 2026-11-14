@@ -4,32 +4,24 @@ import {
   Text, 
   StyleSheet, 
   TouchableOpacity, 
-  TextInput, 
-  FlatList,
   ScrollView,
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform
 } from 'react-native';
 import { supabase } from './supabase';
+import VenueCampaign from './VenueCampaign';
 import { signOutVenue } from './authService';
 import { useFocusEffect } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 
 export default function VenueOwnerScreen({ navigation }) {
   const [username, setUsername] = useState('Mekan Sahibi');
-  const [announcementText, setAnnouncementText] = useState('');
 
   // Mekan sahibinin kendi mekanları
   const [myVenues, setMyVenues] = useState([]);
   const [loadingVenues, setLoadingVenues] = useState(true);
   
-  // Mekanın kendi yaptığı paylaşımlar/duyurular listesi
-  const [announcements, setAnnouncements] = useState([
-    { id: '1', text: 'Bu akşam saat 20:00\'de akustik canlı müzik gecemiz başlıyor! 🎸🎙️', time: '3 saat önce' },
-    { id: '2', text: 'Hafta içine özel: Alacağınız ikinci kahvede %30 indirim fırsatı! ☕✨', time: 'Dün' }
-  ]);
-
   useFocusEffect(useCallback(() => {
     supabase.auth.getUser().then(({ data }) => {
       if (data?.user) {
@@ -241,22 +233,6 @@ const addGalleryPhoto = async (venue) => {
 
 
 
-  const handlePublishAnnouncement = () => {
-    if (!announcementText.trim()) {
-      alert("Duyuru metni boş olamaz!");
-      return;
-    }
-
-    const newAnnouncement = {
-      id: Date.now().toString(),
-      text: announcementText.trim(),
-      time: 'Şimdi'
-    };
-
-    setAnnouncements([newAnnouncement, ...announcements]);
-    setAnnouncementText('');
-  };
-
   const handleSignOut = async () => {
     try { await signOutVenue(); }
     catch (failure) { alert(failure.message); }
@@ -284,8 +260,8 @@ const addGalleryPhoto = async (venue) => {
 
       {/* Mekanlarım Bölümü: Geçiş Noktası */}
       <View style={styles.venuesSectionHeader}>
-        <Text style={styles.boxTitle}>Mekan 🏢</Text>
-        {!loadingVenues && myVenues.length === 0 && <TouchableOpacity
+        <Text style={styles.boxTitle}>Mekânlarım</Text>
+        {!loadingVenues && <TouchableOpacity
           style={styles.addVenueButton}
           onPress={() => navigation.navigate('AddVenue')}
         >
@@ -348,41 +324,10 @@ const addGalleryPhoto = async (venue) => {
         </View>
       )}
 
-      {/* Orta Kısım: Kampanya / Duyuru Geçme Kutusu */}
-      <View style={styles.shareContainer}>
-        <Text style={styles.boxTitle}>Müşterilerinize Duyurun 📢</Text>
-        <TextInput
-          style={styles.shareInput}
-          placeholder="Mekanınızda şu an ne var? Kampanya, etkinlik veya anlık doluluk bilgisini girin..."
-          placeholderTextColor="#aaa"
-          multiline
-          value={announcementText}
-          onChangeText={setAnnouncementText}
-        />
-        
-        <View style={styles.shareActionRow}>
-          <Text style={styles.charCountText}>{announcementText.length}/280</Text>
-          <TouchableOpacity style={styles.shareButton} onPress={handlePublishAnnouncement}>
-            <Text style={styles.shareButtonText}>Duyuru Yap</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      <Text style={styles.sectionTitle}>Aktif Duyurularımız & Kampanyalar</Text>
-
-      {/* Alt Kısım: Mekanın Kendi Duyuru Akışı */}
+      <Text style={styles.sectionTitle}>Duyurular</Text>
       <View style={styles.feedList}>
-        {announcements.map(item => (
-          <View key={item.id} style={styles.postCard}>
-            <View style={styles.postHeader}>
-              <Text style={styles.postUser}>📢 {username}</Text>
-              <Text style={styles.postTime}>{item.time}</Text>
-            </View>
-            <Text style={styles.postText}>{item.text}</Text>
-            <View style={styles.activeBadge}>
-              <Text style={styles.activeBadgeText}>● Yayında</Text>
-            </View>
-          </View>
+        {myVenues.map(venue => (
+          <VenueCampaign key={venue.id} venueId={venue.id} canManage manageExisting venueName={venue.name} />
         ))}
       </View>
       </ScrollView>
@@ -445,52 +390,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
-  shareContainer: {
-    backgroundColor: '#fff',
-    marginHorizontal: 15,
-    marginTop: 15,
-    borderRadius: 16,
-    padding: 15,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
   boxTitle: {
     fontSize: 14,
     fontWeight: 'bold',
     color: '#333',
     marginBottom: 8,
-  },
-  shareInput: {
-    minHeight: 70,
-    fontSize: 14,
-    color: '#333',
-    textAlignVertical: 'top',
-    backgroundColor: '#FAFAFA',
-    borderRadius: 8,
-    padding: 10,
-    borderWidth: 1,
-    borderColor: '#EEEEEE',
-  },
-  shareActionRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  charCountText: {
-    color: '#aaa',
-    fontSize: 12,
-  },
-  shareButton: {
-    backgroundColor: '#4A90E2',
-    paddingVertical: 8,
-    paddingHorizontal: 20,
-    borderRadius: 20,
-  },
-  shareButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 14,
   },
   sectionTitle: {
     fontSize: 15,
@@ -503,46 +407,6 @@ const styles = StyleSheet.create({
   feedList: {
     paddingHorizontal: 15,
     paddingBottom: 20,
-  },
-  postCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 15,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
-  postHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  postUser: {
-    fontWeight: 'bold',
-    color: '#4A90E2',
-    fontSize: 14,
-  },
-  postTime: {
-    color: '#aaa',
-    fontSize: 12,
-  },
-  postText: {
-    color: '#333',
-    fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 10,
-  },
-  activeBadge: {
-    backgroundColor: '#E8F5E9',
-    alignSelf: 'flex-start',
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 6,
-  },
-  activeBadgeText: {
-    color: '#2E7D32',
-    fontSize: 11,
-    fontWeight: 'bold',
   },
   venuesSectionHeader: {
     flexDirection: 'row',
