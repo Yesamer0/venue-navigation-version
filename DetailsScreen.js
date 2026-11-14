@@ -22,6 +22,7 @@ import VenueMoments from './VenueMoments';
 import MomentFeed from './MomentFeed';
 import MenuPhotoImport from './MenuPhotoImport';
 import VenueAccountPhotos from './VenueAccountPhotos';
+import VenueCampaign from './VenueCampaign';
 import { getMenuGroup, groupMenuCategories } from './menuGrouping';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { palette } from './theme';
@@ -978,6 +979,7 @@ const taggedPhotos = venuePhotos.filter(
         )}
       </View>
 
+      <VenueCampaign key={item.id} venueId={item.id} canManage={isOwner && !readOnly} />
       {isOwner && <MenuPhotoImport venueId={item.id} canManage={isOwner} onImported={fetchMenuItems} />}
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
         <Text style={{ fontSize: 19, fontWeight: 'bold', color: '#333' }}>Menü 🍽️</Text>
