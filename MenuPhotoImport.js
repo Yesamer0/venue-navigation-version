@@ -111,12 +111,7 @@ export default function MenuPhotoImport({ venueId, canManage = false, onImported
   const changes = preview?.changes;
   if (!canManage) return null;
   return <View style={styles.card}>
-    <View style={styles.header}>
-      <Text style={[styles.title, styles.headerTitle]}>Yapay zekâyla menü ekle</Text>
-      <TouchableOpacity accessibilityRole="button" disabled={busy} accessibilityState={{ disabled: busy }} onPress={() => choose('file')} style={[styles.secondary, styles.fileButton]}>
-        <Text style={styles.actionText}>Dosya seç</Text>
-      </TouchableOpacity>
-    </View>
+    <Text style={styles.title}>Yapay zekâyla menü ekle</Text>
     <Text style={styles.help}>Net bir fotoğraf çek veya en fazla 8 MB boyutunda PDF, JPEG ya da PNG seç. Okunan ürünleri ve fiyatları kaydetmeden önce kontrol edebilirsin.</Text>
     {!!photo?.name && <Text style={styles.status}>{photo.name}</Text>}
     {photo && photo.mimeType !== 'application/pdf' && <Image accessibilityLabel="Seçilen menü fotoğrafı" source={{ uri: photo.uri }} style={styles.preview} resizeMode="contain" />}
@@ -139,6 +134,7 @@ export default function MenuPhotoImport({ venueId, canManage = false, onImported
       <View style={styles.actions}>
         <TouchableOpacity accessibilityRole="button" onPress={() => choose('gallery')} style={styles.secondary}><Text style={styles.actionText}>Galeriden seç</Text></TouchableOpacity>
         <TouchableOpacity accessibilityRole="button" onPress={() => choose('camera')} style={styles.secondary}><Text style={styles.actionText}>Fotoğraf çek</Text></TouchableOpacity>
+        <TouchableOpacity accessibilityRole="button" onPress={() => choose('file')} style={styles.secondary}><Text style={styles.actionText}>Dosya seç</Text></TouchableOpacity>
       </View>
     </>}
   </View>;
@@ -148,9 +144,6 @@ const styles = StyleSheet.create({
   changeHeading: { color: '#702044', fontWeight: '700', marginTop: 12, marginBottom: 6 }, changeLine: { color: '#493640', lineHeight: 22 },
   card: { padding: 16, backgroundColor: '#FFF5F8', borderRadius: 18, marginBottom: 18, borderWidth: 1, borderColor: '#F1D6E1' },
   title: { color: '#702044', fontWeight: '700', fontSize: 18 },
-  header: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  headerTitle: { flex: 1 },
-  fileButton: { flexGrow: 0 },
   help: { color: '#665660', fontSize: 13, lineHeight: 20, marginVertical: 8 },
   preview: { width: '100%', height: 220, borderRadius: 12, backgroundColor: '#fff', marginVertical: 8 },
   status: { color: '#624152', lineHeight: 21, marginVertical: 8 },
@@ -158,7 +151,7 @@ const styles = StyleSheet.create({
   errorText: { color: '#A32C24', fontWeight: '600', lineHeight: 21 },
   primary: { backgroundColor: '#A52A61', padding: 14, borderRadius: 12, alignItems: 'center', marginVertical: 8 },
   primaryText: { color: '#fff', fontWeight: '700' },
-  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  secondary: { flexGrow: 1, padding: 10, minHeight: 44, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff', borderRadius: 12, borderWidth: 1, borderColor: '#E8C4D4' },
-  actionText: { color: '#92315B', fontWeight: '600' },
+  actions: { flexDirection: 'row', gap: 8 },
+  secondary: { flexGrow: 1, flexShrink: 1, paddingVertical: 10, paddingHorizontal: 6, minHeight: 44, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff', borderRadius: 12, borderWidth: 1, borderColor: '#E8C4D4' },
+  actionText: { color: '#92315B', fontWeight: '600', textAlign: 'center' },
 });
