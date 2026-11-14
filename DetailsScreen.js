@@ -1275,7 +1275,7 @@ const taggedPhotos = venuePhotos.filter(
       </View>
 
       <View style={{ paddingHorizontal: 16 }}>
-        <VenueCampaign key={item.id} venueId={item.id} />
+        <VenueCampaign key={item.id} venueId={item.id} ownerPreview={isOwner && !readOnly} />
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 8, paddingBottom: 16 }}>
         {[['menu', 'Menü'], ['accountphotos', 'Fotoğraflar'], ['photos', 'Ziyaretçiler'], ['reviews', 'Yorumlar']].map(([key, label]) => (

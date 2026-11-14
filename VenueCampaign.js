@@ -33,10 +33,10 @@ function istanbulDate() {
 }
 
 export default function VenueCampaign({
-  venueId, canManage, manageExisting = false, venueName, onClose, onSaved, refreshVersion,
+  venueId, canManage, manageExisting = false, ownerPreview = false, venueName, onClose, onSaved, refreshVersion,
 }) {
   const cardEditor = Boolean(onClose);
-  const managesSchedule = canManage && (manageExisting || cardEditor);
+  const includeScheduled = ownerPreview || (canManage && (manageExisting || cardEditor));
   const [campaign, setCampaign] = useState(null);
   const [loadState, setLoadState] = useState('loading');
   const [retry, setRetry] = useState(0);
@@ -72,7 +72,7 @@ export default function VenueCampaign({
       const loadRevision = revision.current;
       try {
         const { data, error } = await supabase.rpc('get_venue_campaign', {
-          p_venue_id: String(venueId), p_manage: managesSchedule,
+          p_venue_id: String(venueId), p_manage: includeScheduled,
         });
         if (error) throw error;
         if (active && loadRevision === revision.current) {
@@ -91,7 +91,7 @@ export default function VenueCampaign({
       active = false;
       if (timer !== null) clearInterval(timer);
     };
-  }, [venueId, retry, managesSchedule, cardEditor, openEditor, canManage, refreshVersion]));
+  }, [venueId, retry, includeScheduled, cardEditor, openEditor, canManage, refreshVersion]));
 
   const pickPhoto = async () => {
     setPicking(true);
@@ -200,6 +200,9 @@ export default function VenueCampaign({
               ? <Text style={styles.description}>{range} · {status}</Text>
               : <Text style={styles.description} numberOfLines={expanded ? undefined : 2}>{campaign.description}</Text>}
             {manageExisting && expanded && <Text style={styles.description}>{campaign.description}</Text>}
+            {ownerPreview && !campaign.is_active && (
+              <Text style={styles.action}>{status} · {range} · İşletme önizlemesi</Text>
+            )}
           </View>
           <Text style={styles.action} accessible={false}>{expanded ? '−' : '+'}</Text>
         </TouchableOpacity>
