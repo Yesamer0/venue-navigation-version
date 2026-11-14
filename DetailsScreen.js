@@ -979,7 +979,6 @@ const taggedPhotos = venuePhotos.filter(
         )}
       </View>
 
-      <VenueCampaign key={item.id} venueId={item.id} />
       {isOwner && <MenuPhotoImport venueId={item.id} canManage={isOwner} onImported={fetchMenuItems} />}
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
         <Text style={{ fontSize: 19, fontWeight: 'bold', color: '#333' }}>Menü 🍽️</Text>
@@ -1275,6 +1274,9 @@ const taggedPhotos = venuePhotos.filter(
         </View>
       </View>
 
+      <View style={{ paddingHorizontal: 16 }}>
+        <VenueCampaign key={item.id} venueId={item.id} />
+      </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 8, paddingBottom: 16 }}>
         {[['menu', 'Menü'], ['accountphotos', 'Fotoğraflar'], ['photos', 'Ziyaretçiler'], ['reviews', 'Yorumlar']].map(([key, label]) => (
           <TouchableOpacity key={key} accessibilityRole="tab" accessibilityState={{ selected: activeMainTab === key }} onPress={() => setActiveMainTab(key)} style={{ minHeight: 44, justifyContent: 'center', paddingHorizontal: 13, borderRadius: 14, borderWidth: 1, borderColor: palette.border, backgroundColor: activeMainTab === key ? palette.roseTint : palette.surface }}>

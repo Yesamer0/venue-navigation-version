@@ -25,6 +25,13 @@ function isValidDate(value) {
   return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
 }
 
+function istanbulDate() {
+  const parts = new Intl.DateTimeFormat('en', {
+    timeZone: 'Europe/Istanbul', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(new Date());
+  return ['year', 'month', 'day'].map(type => parts.find(part => part.type === type).value).join('-');
+}
+
 export default function VenueCampaign({
   venueId, canManage, manageExisting = false, venueName, onClose, onSaved, refreshVersion,
 }) {
@@ -50,8 +57,9 @@ export default function VenueCampaign({
   const openEditor = useCallback((current) => {
     setTitle(current?.title ?? '');
     setDescription(current?.description ?? '');
-    setStartsOn(current?.starts_on ?? '');
-    setEndsOn(current?.ends_on ?? '');
+    const today = istanbulDate();
+    setStartsOn(current?.starts_on ?? today);
+    setEndsOn(current?.ends_on ?? today);
     setPhotoDraft(undefined);
     setSaveError('');
     setConfirmRemoval(false);
@@ -164,6 +172,8 @@ export default function VenueCampaign({
   const range = campaign?.starts_on
     ? [campaign.starts_on, campaign.ends_on].map(date => date.split('-').reverse().join('.')).join(' – ')
     : 'Tarih belirtilmedi';
+  const status = campaign?.is_active ? 'Yayında'
+    : campaign?.starts_on > istanbulDate() ? 'Planlandı' : 'Süresi doldu';
 
   return (
     <>
@@ -187,7 +197,7 @@ export default function VenueCampaign({
             {manageExisting && <Text style={styles.venueName}>{venueName}</Text>}
             <Text style={styles.title} numberOfLines={expanded ? undefined : 1}>{campaign.title}</Text>
             {manageExisting
-              ? <Text style={styles.description}>{range}</Text>
+              ? <Text style={styles.description}>{range} · {status}</Text>
               : <Text style={styles.description} numberOfLines={expanded ? undefined : 2}>{campaign.description}</Text>}
             {manageExisting && expanded && <Text style={styles.description}>{campaign.description}</Text>}
           </View>
