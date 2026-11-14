@@ -200,8 +200,8 @@ export default function VenueCampaign({
               ? <Text style={styles.description}>{range} · {status}</Text>
               : <Text style={styles.description} numberOfLines={expanded ? undefined : 2}>{campaign.description}</Text>}
             {manageExisting && expanded && <Text style={styles.description}>{campaign.description}</Text>}
-            {ownerPreview && !campaign.is_active && (
-              <Text style={styles.action}>{status} · {range} · İşletme önizlemesi</Text>
+            {!manageExisting && !campaign.is_active && (
+              <Text style={styles.action}>{status} · {range}</Text>
             )}
           </View>
           <Text style={styles.action} accessible={false}>{expanded ? '−' : '+'}</Text>
