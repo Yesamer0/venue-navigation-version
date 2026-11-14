@@ -16,6 +16,7 @@ import { getFreshLocation } from './deviceLocation';
 import { hasPhotoTestAccess } from './photoTestAccess';
 import { refreshPresenceTracking } from './presenceTracking';
 import { supabase } from './supabase'; 
+import { useAuth } from './AuthProvider';
 import { styles } from './styles';
 import { useFocusEffect } from '@react-navigation/native';
 import VenueMoments from './VenueMoments';
@@ -68,6 +69,8 @@ export default function DetailsScreen({ route, navigation, guest = false }) {
   const { item } = route.params;
   const publicDemo = route.params.publicDemo === true;
   const readOnly = guest || publicDemo;
+  const { profile } = useAuth();
+  const isOwner = !readOnly && profile?.is_venue === true && profile.id === item.owner_id;
   const showNotice = (title, message) => {
     if (Platform.OS === 'web') window.alert(message);
     else Alert.alert(title, message);
@@ -89,7 +92,6 @@ export default function DetailsScreen({ route, navigation, guest = false }) {
 
 
   const [currentUser, setCurrentUser] = useState(null);
-  const [isOwner, setIsOwner] = useState(false);
   const [isVenueAccount, setIsVenueAccount] = useState(false);
 
   // --- Favoriler ---
@@ -203,7 +205,6 @@ export default function DetailsScreen({ route, navigation, guest = false }) {
         .maybeSingle();
 
       setCurrentUser({ id: authUser.id, username: profile?.username || 'Gezgin' });
-      setIsOwner(profile?.is_venue === true && item.owner_id === authUser.id);
       setIsVenueAccount(profile?.is_venue === true);
 
       // Kullanıcının bu mekanı daha önce favorileyip favorilemediğini kontrol et
@@ -979,7 +980,6 @@ const taggedPhotos = venuePhotos.filter(
         )}
       </View>
 
-      {isOwner && <MenuPhotoImport venueId={item.id} canManage={isOwner} onImported={fetchMenuItems} />}
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
         <Text style={{ fontSize: 19, fontWeight: 'bold', color: '#333' }}>Menü 🍽️</Text>
         {isOwner && (
@@ -1275,7 +1275,8 @@ const taggedPhotos = venuePhotos.filter(
       </View>
 
       <View style={{ paddingHorizontal: 16 }}>
-        <VenueCampaign key={item.id} venueId={item.id} ownerPreview={isOwner && !readOnly} />
+        <VenueCampaign key={`campaign-${item.id}`} venueId={item.id} ownerPreview={isOwner} />
+        {isOwner && <MenuPhotoImport key={`menu-import-${item.id}`} venueId={item.id} canManage onImported={fetchMenuItems} />}
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 8, paddingBottom: 16 }}>
         {[['menu', 'Menü'], ['accountphotos', 'Fotoğraflar'], ['photos', 'Ziyaretçiler'], ['reviews', 'Yorumlar']].map(([key, label]) => (
