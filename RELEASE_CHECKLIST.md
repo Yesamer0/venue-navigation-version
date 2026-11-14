@@ -114,3 +114,11 @@ Verified auth implementation commit: 5cc2e69e40c49a4160e78de3fc1e25bb56c604db on
 - [x] Misafir kafe görünümü ve Sohbet düğmesindeki giriş uyarısı.
 - [x] Yorum alanı ve gönder düğmesinin klavye açıkken görünmesi.
 - [x] Bağlantı kesildiğinde fotoğraf yenileme ve bağlantı dönünce yeniden deneme.
+
+
+### 14 Kasım, kampanyalar ve dosyadan menü
+
+- Kampanya ilgili kafeye bağlıdır. İşletme panelinden kafe kartıyla oluşturulur, Duyurular bölümünden düzenlenir veya silinir. Metin ve isteğe bağlı fotoğraf desteklenir. Planlanan ve aktif duyurular misafir ve gezginlere kafenin menüsünün üstünde görünür. Canlı Supabase'de iki ziyaretçi rolü doğrulandı. Kafe sahibinin önizlemesinin göründüğünü kullanıcı doğruladı.
+- Menü aktarımında Galeriden seç, Fotoğraf çek ve Dosya seç yan yana. PDF, JPEG ve PNG dosyaları 8 MB'a kadar işlenir. Önizleme ve işletme sahibinin onayı sonrasında menü güncellenir. Canlı örnek PDF ile yapay zekâ okuması, önizleme ve onay testi geçti.
+- [x] Kullanıcı Expo Go ile iPhone'da Dosya seç kısmının çalıştığını doğruladı. Bu telefonda PDF önizlemesinin ve onayının ayrı ayrı denendiği belirtilmedi.
+- Fiziksel uzaklaşma ve yeniden check-in testi ile iki ayrı telefonda fotoğraf beğeni/yorum eşitleme testi açık.
