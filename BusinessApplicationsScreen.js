@@ -22,6 +22,7 @@ export default function BusinessApplicationsScreen() {
   const [search, setSearch] = useState('');
   const [applications, setApplications] = useState([]);
   const [selected, setSelected] = useState(null);
+  const [venues, setVenues] = useState(null);
   const [feedback, setFeedback] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
@@ -75,6 +76,35 @@ export default function BusinessApplicationsScreen() {
     setMessage('Hesap kurulum kodu gönderildi.');
   });
 
+  const loadVenues = async (applicationId) => {
+    const { data, error } = await supabase.rpc('list_application_venues', { p_application_id: applicationId });
+    if (error) throw error;
+    setVenues(data);
+  };
+
+  const toggleApplication = (application) => {
+    setFeedback('');
+    setVenues(null);
+    setSelected(selected === application.id ? null : application.id);
+    if (selected !== application.id && application.status === 'approved') {
+      void run(() => loadVenues(application.id));
+    }
+  };
+
+  const confirmCloseVenue = (applicationId, venue) => {
+    Alert.alert('Mekânı kapat', venue.name + ' Keşfet’ten kalkacak. Gezgin fotoğrafları paylaşanların profillerinde kalacak.', [
+      { text: 'Vazgeç', style: 'cancel' },
+      { text: 'Mekânı kapat', style: 'destructive', onPress: () => void run(async () => {
+        const { error } = await supabase.rpc('close_application_venue', {
+          p_application_id: applicationId, p_venue_id: venue.id,
+        });
+        if (error) throw error;
+        setVenues((current) => current.map((row) => row.id === venue.id ? { ...row, closed_at: true } : row));
+        setMessage('Mekân kapatıldı.');
+      }) },
+    ]);
+  };
+
   const sendFeedback = (application) => {
     const subject = 'VENUE işletme başvurusu — ' + labels[application.status];
     const body = application.feedback || labels[application.status];
@@ -119,7 +149,7 @@ export default function BusinessApplicationsScreen() {
       {rows.map((application) => (
         <View key={application.id} style={styles.card}>
           <TouchableOpacity accessibilityRole="button" accessibilityState={{ expanded: selected === application.id }}
-            disabled={busy} onPress={() => { setSelected(selected === application.id ? null : application.id); setFeedback(''); }}>
+            disabled={busy} onPress={() => toggleApplication(application)}>
             <Text style={styles.name}>{application.details.sign_name}</Text>
             {application.details.legal_name !== application.details.sign_name && (
               <Text>{application.details.legal_name}</Text>
@@ -136,6 +166,21 @@ export default function BusinessApplicationsScreen() {
             {application.status === 'approved' && <TouchableOpacity accessibilityRole="button" disabled={busy} onPress={() => sendSetupCode(application.id)}>
               <Text style={styles.link}>Hesap kurulum kodu gönder</Text>
             </TouchableOpacity>}
+            {application.status === 'approved' && <>
+              {venues?.length === 0 && <Text>Bu başvuruya bağlı mekân yok.</Text>}
+              {venues === null && !busy && <TouchableOpacity accessibilityRole="button"
+                onPress={() => run(() => loadVenues(application.id))}>
+                <Text style={styles.link}>Bağlı mekânları yükle</Text>
+              </TouchableOpacity>}
+              {venues?.map((venue) => <View key={venue.id} style={styles.row}>
+                <Text style={styles.link}>{venue.name}</Text>
+                {venue.closed_at ? <Text style={styles.link}>Kapalı</Text> :
+                  <TouchableOpacity accessibilityRole="button" accessibilityLabel={venue.name + ' mekânını kapat'}
+                    disabled={busy} onPress={() => confirmCloseVenue(application.id, venue)}>
+                    <Text style={styles.link}>Mekânı kapat</Text>
+                  </TouchableOpacity>}
+              </View>)}
+            </>}
             {!!application.feedback && <Text>Geri bildirim: {application.feedback}</Text>}
             {application.status === 'pending' ? <>
               <TextInput accessibilityLabel="Geri bildirim" placeholder="Geri bildirim" style={styles.input}
