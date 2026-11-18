@@ -12,8 +12,14 @@ const sections = [
 ];
 const labels = { pending: 'Onay bekliyor', changes: 'Eksik bilgi istendi', approved: 'Onaylandı', rejected: 'Reddedildi' };
 
+function normalizeCompanyName(value) {
+  return (value ?? '').toLocaleLowerCase('tr-TR').normalize('NFD')
+    .replace(/[̀-ͯ]/g, '').replace(/ı/g, 'i').trim().replace(/\s+/g, ' ');
+}
+
 export default function BusinessApplicationsScreen() {
   const [section, setSection] = useState(0);
+  const [search, setSearch] = useState('');
   const [applications, setApplications] = useState([]);
   const [selected, setSelected] = useState(null);
   const [feedback, setFeedback] = useState('');
@@ -77,7 +83,9 @@ export default function BusinessApplicationsScreen() {
       .catch(() => Alert.alert('E-posta uygulaması açılamadı'));
   };
 
-  const rows = applications.filter((application) => sections[section].statuses.includes(application.status));
+  const query = normalizeCompanyName(search);
+  const rows = applications.filter(({ status, details }) => sections[section].statuses.includes(status) &&
+    (!query || [details.sign_name, details.legal_name].some((name) => normalizeCompanyName(name).includes(query))));
 
   return <SafeAreaView style={styles.page}>
     <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
@@ -94,14 +102,28 @@ export default function BusinessApplicationsScreen() {
           </TouchableOpacity>
         ))}
       </View>
+      <View style={styles.searchRow}>
+        <TextInput accessibilityLabel="Şirket unvanı veya tabela adı ara"
+          placeholder="Şirket unvanı veya tabela adı ara" placeholderTextColor="#665960"
+          autoCapitalize="none" autoCorrect={false} returnKeyType="search"
+          style={styles.searchInput} value={search} onChangeText={setSearch} />
+        {!!search && <TouchableOpacity accessibilityRole="button" onPress={() => setSearch('')}>
+          <Text style={styles.link}>Temizle</Text>
+        </TouchableOpacity>}
+      </View>
       {!!message && <Text accessibilityLiveRegion="polite" style={styles.message}>{message}</Text>}
       {busy && <Text>İşleniyor…</Text>}
-      {!busy && rows.length === 0 && <Text style={styles.message}>Bu bölümde başvuru yok.</Text>}
+      {!busy && rows.length === 0 && <Text accessibilityLiveRegion="polite" style={styles.message}>
+        {query ? 'Bu bölümde aramana uyan başvuru yok.' : 'Bu bölümde başvuru yok.'}
+      </Text>}
       {rows.map((application) => (
         <View key={application.id} style={styles.card}>
           <TouchableOpacity accessibilityRole="button" accessibilityState={{ expanded: selected === application.id }}
             disabled={busy} onPress={() => { setSelected(selected === application.id ? null : application.id); setFeedback(''); }}>
             <Text style={styles.name}>{application.details.sign_name}</Text>
+            {application.details.legal_name !== application.details.sign_name && (
+              <Text>{application.details.legal_name}</Text>
+            )}
             <Text>{labels[application.status]}</Text>
           </TouchableOpacity>
           {selected === application.id && <View style={styles.details}>
@@ -147,5 +169,8 @@ const styles = StyleSheet.create({
   card: { backgroundColor: palette.surface, padding: 14, borderRadius: 12 },
   name: { fontSize: 16, fontWeight: '700', color: palette.ink },
   details: { marginTop: 12, gap: 8 },
+  searchRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  searchInput: { flex: 1, minHeight: 44, borderWidth: 1, borderColor: palette.border, borderRadius: 8,
+    paddingHorizontal: 10, backgroundColor: palette.surface, color: palette.ink },
   input: { borderWidth: 1, borderColor: palette.border, borderRadius: 8, minHeight: 72, padding: 10 },
 });
