@@ -33,7 +33,7 @@ const COLORS = {
 
 const PRICE_LEVELS = ['₺', '₺₺', '₺₺₺'];
 
-const CATEGORY_ICONS = { Kafe: '☕', Restoran: '🍽️', Bar: '🍹', Etkinlik: '🎉' };
+const CATEGORY_ICONS = { Kafe: '☕', Restoran: '🍽️', Bar: '🍹', Pub: '🍺', Etkinlik: '🎉' };
 const CATEGORIES = [
   { name: 'Hepsi', icon: '✨' },
   ...VENUE_CATEGORIES.map((name) => ({ name, icon: CATEGORY_ICONS[name] })),
