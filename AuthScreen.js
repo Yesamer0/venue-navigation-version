@@ -10,12 +10,13 @@ import {
   Platform, KeyboardAvoidingView, ScrollView 
 } from 'react-native';
 import { supabase } from './supabase';
-import { authErrorMessage, validateAuthInput } from './authService';
+import { authErrorMessage, parseBirthDate, validateAuthInput } from './authService';
 
 export default function AuthScreen({ navigation }) {
   const lock = useRef(false);
   const [formError, setFormError] = useState('');
   const [username, setUsername] = useState('');
+  const [birthDate, setBirthDate] = useState('');
   const [email, setEmail] = useState(''); 
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -26,7 +27,11 @@ export default function AuthScreen({ navigation }) {
     if (lock.current) return;
     setFormError('');
     let input;
-    try { input = validateAuthInput({ username, email, password, registering: isRegisterMode }); }
+    let privateBirthDate;
+    try {
+      input = validateAuthInput({ username, email, password, registering: isRegisterMode });
+      if (isRegisterMode && !isVenueOwner) privateBirthDate = parseBirthDate(birthDate);
+    }
     catch (failure) { setFormError(failure.message); return; }
     lock.current = true; setLoading(true);
     try {
@@ -35,11 +40,15 @@ export default function AuthScreen({ navigation }) {
         if (checkError) throw checkError;
         if (!available) { setFormError('Bu kullanıcı adı kullanılıyor. Başka bir ad seç.'); return; }
         const { data, error } = await supabase.auth.signUp({ email: input.email, password: input.password,
-          options: { data: { username: input.username, is_venue: isVenueOwner } },
+          options: { data: {
+            username: input.username,
+            is_venue: isVenueOwner,
+            ...(privateBirthDate ? { birth_date: privateBirthDate } : {}),
+          } },
         });
         if (error) throw error;
         if (!data?.session) {
-          setIsRegisterMode(false); setPassword('');
+          setIsRegisterMode(false); setPassword(''); setBirthDate('');
           alert('Hesabını tamamlamak için e-postandaki doğrulama bağlantısını aç, ardından giriş yap.');
         }
       } else {
@@ -59,6 +68,24 @@ export default function AuthScreen({ navigation }) {
         <Text style={styles.subtitle}>
           {isRegisterMode ? 'Yeni bir hesap oluşturun' : 'Hesabınıza giriş yapın'}
         </Text>
+
+        {isRegisterMode && (
+          <View accessibilityRole="radiogroup" accessibilityLabel="Hesap türü">
+            {[[false, 'Gezgin hesabı'], [true, 'İşletme hesabı']].map(([isBusiness, label]) => (
+              <TouchableOpacity
+                key={label}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: isVenueOwner === isBusiness }}
+                style={[styles.checkboxRow, isVenueOwner === isBusiness && styles.checkboxRowActive]}
+                disabled={loading}
+                onPress={() => { setIsVenueOwner(isBusiness); setFormError(''); }}
+              >
+                <View style={[styles.checkboxCircle, isVenueOwner === isBusiness && styles.checkboxCircleChecked]} />
+                <Text style={[styles.checkboxLabel, isVenueOwner === isBusiness && styles.checkboxLabelActive]}>{label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
 
         {isRegisterMode && (
           <TextInput
@@ -99,16 +126,23 @@ export default function AuthScreen({ navigation }) {
           placeholderTextColor="#999"
         />
 
-        {isRegisterMode && (
-          <TouchableOpacity 
-            style={[styles.checkboxRow, isVenueOwner && styles.checkboxRowActive]}
-            disabled={loading} onPress={() => setIsVenueOwner(!isVenueOwner)}
-          >
-            <View style={[styles.checkboxCircle, isVenueOwner && styles.checkboxCircleChecked]} />
-            <Text style={[styles.checkboxLabel, isVenueOwner && styles.checkboxLabelActive]}>
-              Ben bir Mekan Sahibiyim 🏢
+        {isRegisterMode && !isVenueOwner && (
+          <View>
+            <Text style={{ color: '#555', marginBottom: 6 }}>Doğum tarihi (isteğe bağlı)</Text>
+            <TextInput
+              accessibilityLabel="Doğum tarihi"
+              style={styles.input}
+              editable={!loading}
+              placeholder="GG.AA.YYYY"
+              placeholderTextColor="#777"
+              maxLength={10}
+              value={birthDate}
+              onChangeText={setBirthDate}
+            />
+            <Text style={{ color: '#555', marginBottom: 12 }}>
+              Doğum günü kampanyaları için kullanılır ve profilinde gösterilmez.
             </Text>
-          </TouchableOpacity>
+          </View>
         )}
 
         {!!formError && <Text accessibilityRole="alert" style={{ color: '#B42318', lineHeight: 21, marginBottom: 12 }}>{formError}</Text>}
