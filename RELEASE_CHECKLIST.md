@@ -122,3 +122,11 @@ Verified auth implementation commit: 5cc2e69e40c49a4160e78de3fc1e25bb56c604db on
 - Menü aktarımında Galeriden seç, Fotoğraf çek ve Dosya seç yan yana. PDF, JPEG ve PNG dosyaları 8 MB'a kadar işlenir. Önizleme ve işletme sahibinin onayı sonrasında menü güncellenir. Canlı örnek PDF ile yapay zekâ okuması, önizleme ve onay testi geçti.
 - [x] Kullanıcı Expo Go ile iPhone'da Dosya seç kısmının çalıştığını doğruladı. Bu telefonda PDF önizlemesinin ve onayının ayrı ayrı denendiği belirtilmedi.
 - Fiziksel uzaklaşma ve yeniden check-in testi ile iki ayrı telefonda fotoğraf beğeni/yorum eşitleme testi açık.
+
+
+### 18 Kasım, işletme başvuruları ve yönetici girişi
+
+- [x] Supabase özel SMTP üzerinden test e-postası ulaştı. Yönetici şifre belirleme kodu gönderildi. Kullanıcı Expo Go üzerinden kodla şifre belirleyip yönetici hesabına girebildiğini doğruladı.
+- [x] Başvurular ekranı Bekleyenler, Düzeltme Bekleyenler ve Sonuçlananlar bölümlerini içerir. Canlı iki test hesabıyla sıradan kullanıcının başvuruları listeleyemediği veya karar veremediği, yöneticinin eksik bilgi isteyebildiği ve düzeltilen başvuruyu onaylayabildiği doğrulandı. Geçici kayıtlar temizlendi.
+- [ ] Gerçek işletme başvurusunun iPhone üzerinden gönderilmesi ve onay sonrası kurulum koduyla hesabın açılması henüz uçtan uca denenmedi. Ret ve eksik bilgi notları başvuru takibinde görünür. Bu mesajların e-postayla iletilmesi için yönetici taslağı açıp gönderir.
+- [ ] Yayın hazırlığında sıradaki geliştirme hesap silme. Akışı ve veri temizliğini doğrulamadan sonraki yayın maddesine geçme. Ardından kapsamlı erişim denetimi, içerik şikâyetleri ve gizlilik metni değerlendirilecek.
