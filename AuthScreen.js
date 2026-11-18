@@ -12,13 +12,13 @@ import {
 import { supabase } from './supabase';
 import { VENUE_CATEGORIES } from './venueCategories';
 import { businessSignupFields, validateBusinessSignup } from './businessSignup';
-import { authErrorMessage, parseBirthDate, validateAuthInput } from './authService';
+import { authErrorMessage, parseBirthday, validateAuthInput } from './authService';
 
 export default function AuthScreen({ navigation }) {
   const lock = useRef(false);
   const [formError, setFormError] = useState('');
   const [username, setUsername] = useState('');
-  const [birthDate, setBirthDate] = useState('');
+  const [birthday, setBirthday] = useState('');
   const [businessFields, setBusinessFields] = useState({});
   const [isBusinessTypeOpen, setIsBusinessTypeOpen] = useState(false);
   const [email, setEmail] = useState(''); 
@@ -31,11 +31,11 @@ export default function AuthScreen({ navigation }) {
     if (lock.current) return;
     setFormError('');
     let input;
-    let privateBirthDate;
+    let privateBirthday;
     let businessDetails;
     try {
       input = validateAuthInput({ username, email, password, registering: isRegisterMode });
-      if (isRegisterMode && !isVenueOwner) privateBirthDate = parseBirthDate(birthDate);
+      if (isRegisterMode && !isVenueOwner) privateBirthday = parseBirthday(birthday);
       if (isRegisterMode && isVenueOwner) businessDetails = validateBusinessSignup(businessFields);
     }
     catch (failure) { setFormError(failure.message); return; }
@@ -49,13 +49,13 @@ export default function AuthScreen({ navigation }) {
           options: { data: {
             username: input.username,
             is_venue: isVenueOwner,
-            ...(privateBirthDate ? { birth_date: privateBirthDate } : {}),
+            ...(privateBirthday ? { birthday: privateBirthday } : {}),
             ...(businessDetails ? { business_signup: businessDetails } : {}),
           } },
         });
         if (error) throw error;
         if (!data?.session) {
-          setIsRegisterMode(false); setPassword(''); setBirthDate(''); setBusinessFields({});
+          setIsRegisterMode(false); setPassword(''); setBirthday(''); setBusinessFields({});
           alert('Hesabını tamamlamak için e-postandaki doğrulama bağlantısını aç, ardından giriş yap.');
         }
       } else {
@@ -193,19 +193,19 @@ export default function AuthScreen({ navigation }) {
 
         {isRegisterMode && !isVenueOwner && (
           <View>
-            <Text style={{ color: '#555', marginBottom: 6 }}>Doğum tarihi (isteğe bağlı)</Text>
+            <Text style={{ color: '#555', marginBottom: 6 }}>Doğum günü (isteğe bağlı)</Text>
             <TextInput
-              accessibilityLabel="Doğum tarihi"
+              accessibilityLabel="Doğum günü"
               style={styles.input}
               editable={!loading}
-              placeholder="GG.AA.YYYY"
+              placeholder="GG.AA"
               placeholderTextColor="#777"
-              maxLength={10}
-              value={birthDate}
-              onChangeText={setBirthDate}
+              maxLength={5}
+              value={birthday}
+              onChangeText={setBirthday}
             />
             <Text style={{ color: '#555', marginBottom: 12 }}>
-              Doğum günü kampanyaları için kullanılır ve profilinde gösterilmez.
+              Doğum günü kampanyaları için yalnızca gün ve ay alınır. Profilinde gösterilmez.
             </Text>
           </View>
         )}

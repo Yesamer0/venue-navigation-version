@@ -23,28 +23,20 @@ export function validateAuthInput({ username, email, password, registering }) {
   return { email: cleanEmail, username: cleanName, password };
 }
 
-export function parseBirthDate(value) {
+export function parseBirthday(value) {
   const trimmed = value.trim();
   if (!trimmed) return null;
 
-  const match = /^(\d{2})\.(\d{2})\.(\d{4})$/.exec(trimmed);
-  if (!match) throw new Error('Doğum tarihini GG.AA.YYYY biçiminde yaz.');
+  const match = /^(\d{2})\.(\d{2})$/.exec(trimmed);
+  if (!match) throw new Error('Doğum gününü GG.AA biçiminde yaz.');
 
-  const [, day, month, year] = match;
-  const isoDate = `${year}-${month}-${day}`;
-  const date = new Date(`${isoDate}T00:00:00Z`);
-  if (Number(year) < 1 || !Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== isoDate) {
-    throw new Error('Geçerli bir doğum tarihi yaz.');
+  const day = Number(match[1]);
+  const month = Number(match[2]);
+  const daysInMonth = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  if (month < 1 || month > 12 || day < 1 || day > daysInMonth[month - 1]) {
+    throw new Error('Geçerli bir doğum günü yaz.');
   }
-
-  const today = new Date();
-  const localDate = [
-    String(today.getFullYear()).padStart(4, '0'),
-    String(today.getMonth() + 1).padStart(2, '0'),
-    String(today.getDate()).padStart(2, '0'),
-  ].join('-');
-  if (isoDate > localDate) throw new Error('Doğum tarihi gelecekte olamaz.');
-  return isoDate;
+  return { day, month };
 }
 
 export async function signOutVenue() {
