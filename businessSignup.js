@@ -13,6 +13,15 @@ export const businessSignupFields = [
   { key: 'address', label: 'İlk mekânın açık adresi', maxLength: 250 },
 ];
 
+export function validateBusinessReceipt(value) {
+  const receipt = value.trim();
+  if (!receipt) return null;
+  if (!/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(receipt)) {
+    throw new Error('Takip kodu geçersiz. İlk başvurunda bu alanı boş bırak.');
+  }
+  return receipt;
+}
+
 export function validateBusinessSignup(values) {
   const details = {};
   for (const { key, label, maxLength, optional } of businessSignupFields) {

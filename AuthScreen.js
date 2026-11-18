@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { supabase } from './supabase';
 import { VENUE_CATEGORIES } from './venueCategories';
-import { businessSignupFields, validateBusinessSignup } from './businessSignup';
+import { businessSignupFields, validateBusinessReceipt, validateBusinessSignup } from './businessSignup';
 import { authErrorMessage, parseBirthday, validateAuthInput } from './authService';
 
 export default function AuthScreen({ navigation }) {
@@ -41,14 +41,18 @@ export default function AuthScreen({ navigation }) {
     if (lock.current) return;
     setFormError('');
     setApplicationStatus(null);
-    if (!/^[0-9a-f-]{36}$/i.test(receipt.trim())) {
-      setFormError('Başvuru takip kodunu kontrol et.');
+    let trackingCode;
+    try {
+      trackingCode = validateBusinessReceipt(receipt);
+      if (!trackingCode) throw new Error('Başvuru takip kodunu yaz.');
+    } catch (failure) {
+      setFormError(failure.message);
       return;
     }
     lock.current = true;
     setLoading(true);
     try {
-      const { data, error } = await supabase.rpc('get_business_application_status', { p_receipt: receipt.trim() });
+      const { data, error } = await supabase.rpc('get_business_application_status', { p_receipt: trackingCode });
       if (error || !data?.[0]) throw new Error('Başvuru bulunamadı.');
       setApplicationStatus(data[0]);
     } catch (failure) { setFormError(failure.message); }
@@ -61,10 +65,12 @@ export default function AuthScreen({ navigation }) {
     let input;
     let privateBirthday;
     let businessDetails;
+    let trackingCode;
     try {
       if (isApplication) {
         const address = email.trim().toLowerCase();
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address)) throw new Error('Geçerli bir e-posta adresi yaz.');
+        if (address.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address)) throw new Error('Geçerli bir e-posta adresi yaz.');
+        trackingCode = validateBusinessReceipt(receipt);
         input = { email: address };
       } else {
         input = validateAuthInput({ username, email, password, registering: isRegisterMode });
@@ -77,7 +83,7 @@ export default function AuthScreen({ navigation }) {
     try {
       if (isApplication) {
         const { data, error } = await supabase.rpc('submit_business_application', {
-          p_email: input.email, p_details: businessDetails, p_receipt: receipt.trim() || null,
+          p_email: input.email, p_details: businessDetails, p_receipt: trackingCode,
         });
         if (error) throw error;
         setReceipt(data);
@@ -106,8 +112,13 @@ export default function AuthScreen({ navigation }) {
       // The root auth listener selects the authenticated screen and clears old navigation history.
     } catch (failure) {
       const message = failure?.message;
-      setFormError(message === 'application_rate_limit' ? 'Bu e-posta ile az önce başvuru gönderildi. Takip kodunu kontrol et.' :
-        message === 'application_not_editable' ? 'Bu takip koduyla düzeltme gönderilemiyor.' : authErrorMessage(failure));
+      if (isApplication && (message === 'invalid_application' || failure?.code === '22P02')) {
+        setFormError(failure?.code === '22P02' ? 'Takip kodu geçersiz. İlk başvurunda bu alanı boş bırak.' :
+          'Başvuru bilgileri kabul edilmedi. E-posta, iş tipi, VKN, telefon ve sayı alanlarını kontrol et.');
+      } else {
+        setFormError(message === 'application_rate_limit' ? 'Bu e-posta ile az önce başvuru gönderildi. Takip kodunu kontrol et.' :
+          message === 'application_not_editable' ? 'Bu kodla düzeltme gönderilemiyor. İlk başvurunda takip kodunu boş bırak.' : authErrorMessage(failure));
+      }
     }
     finally { lock.current = false; setLoading(false); }
   };
@@ -259,7 +270,8 @@ export default function AuthScreen({ navigation }) {
           <View>
             <Text style={styles.fieldLabel}>Başvuru takip kodu{isApplication ? ' (düzeltme için)' : ''}</Text>
             <TextInput accessibilityLabel="Başvuru takip kodu" style={styles.input} editable={!loading}
-              autoCapitalize="none" autoCorrect={false} maxLength={36} value={receipt} onChangeText={setReceipt} />
+              autoCapitalize="none" autoCorrect={false} placeholder={isApplication ? 'İlk başvuruda boş bırak' : 'Takip kodunu yaz'}
+              maxLength={36} value={receipt} onChangeText={setReceipt} />
             <TouchableOpacity accessibilityRole="button" disabled={loading} onPress={checkApplication} style={styles.switchButton}>
               <Text style={styles.switchText}>Başvuru durumunu gör</Text>
             </TouchableOpacity>
