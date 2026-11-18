@@ -39,6 +39,13 @@ export function parseBirthday(value) {
   return { day, month };
 }
 
+export async function deleteVenueAccount(body) {
+  const { error } = await supabase.functions.invoke('delete-account', { body });
+  if (!error) return;
+  const response = await error.context?.json().catch(() => null);
+  throw new Error(response?.message || 'Hesap silme tamamlanamadı. Bağlantını kontrol edip yeniden dene.');
+}
+
 export async function signOutVenue() {
   const { data: { user } } = await supabase.auth.getUser();
   if (user) {

@@ -12,6 +12,7 @@ import {
 import { supabase } from './supabase';
 import VenueCampaign from './VenueCampaign';
 import { signOutVenue } from './authService';
+import DeleteAccountSection from './DeleteAccountSection';
 import { useFocusEffect } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 
@@ -356,6 +357,7 @@ const addGalleryPhoto = async (venue) => {
           />
         ))}
       </View>
+      <DeleteAccountSection business />
       </ScrollView>
     </KeyboardAvoidingView>
   );

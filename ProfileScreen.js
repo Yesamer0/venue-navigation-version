@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { supabase } from './supabase';
 import { signOutVenue } from './authService';
+import DeleteAccountSection from './DeleteAccountSection';
 import MomentFeed from './MomentFeed';
 
 export default function ProfileScreen({ navigation }) {
@@ -704,6 +705,7 @@ const handleCreateCollection = async () => {
         <MomentFeed userId={profileUserId} navigation={navigation} />
       </View> : null}
 
+      <DeleteAccountSection />
       </ScrollView>
     </KeyboardAvoidingView>
   );

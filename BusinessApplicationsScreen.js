@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Linking, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { supabase } from './supabase';
-import { signOutVenue } from './authService';
+import { deleteVenueAccount, signOutVenue } from './authService';
 import { businessSignupFields } from './businessSignup';
 import { palette } from './theme';
 
@@ -105,6 +105,24 @@ export default function BusinessApplicationsScreen() {
     ]);
   };
 
+  const confirmDeleteAccount = (application) => {
+    Alert.alert('İşletme hesabını sil', application.details.sign_name +
+      ' hesabı ve başvurusu kalıcı olarak silinecek. Mekânları Keşfet’ten kalkacak, gezgin fotoğrafları profillerde kalacak.', [
+      { text: 'Vazgeç', style: 'cancel' },
+      { text: 'Hesabı kalıcı olarak sil', style: 'destructive', onPress: () => void run(async () => {
+        try {
+          await deleteVenueAccount({ applicationId: application.id });
+        } catch (failure) {
+          setMessage(failure.message);
+          return;
+        }
+        setSelected(null);
+        setApplications((current) => current.filter(({ id }) => id !== application.id));
+        setMessage('İşletme hesabı kalıcı olarak silindi.');
+      }) },
+    ]);
+  };
+
   const sendFeedback = (application) => {
     const subject = 'VENUE işletme başvurusu — ' + labels[application.status];
     const body = application.feedback || labels[application.status];
@@ -167,6 +185,9 @@ export default function BusinessApplicationsScreen() {
               <Text style={styles.link}>Hesap kurulum kodu gönder</Text>
             </TouchableOpacity>}
             {application.status === 'approved' && <>
+              <TouchableOpacity accessibilityRole="button" disabled={busy} onPress={() => confirmDeleteAccount(application)}>
+                <Text style={styles.destructive}>İşletme hesabını sil</Text>
+              </TouchableOpacity>
               {venues?.length === 0 && <Text>Bu başvuruya bağlı mekân yok.</Text>}
               {venues === null && !busy && <TouchableOpacity accessibilityRole="button"
                 onPress={() => run(() => loadVenues(application.id))}>
@@ -217,5 +238,6 @@ const styles = StyleSheet.create({
   searchRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   searchInput: { flex: 1, minHeight: 44, borderWidth: 1, borderColor: palette.border, borderRadius: 8,
     paddingHorizontal: 10, backgroundColor: palette.surface, color: palette.ink },
+  destructive: { paddingVertical: 10, color: '#9B1B43', fontWeight: '700' },
   input: { borderWidth: 1, borderColor: palette.border, borderRadius: 8, minHeight: 72, padding: 10 },
 });
