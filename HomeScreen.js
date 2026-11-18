@@ -18,6 +18,7 @@ import VenueMap, { supportsVenueMap } from './VenueMap';
 import { supabase } from './supabase';
 import { useFocusEffect } from '@react-navigation/native';
 import { palette } from './theme';
+import { VENUE_CATEGORIES } from './venueCategories';
 
 const COLORS = {
   background: palette.canvas,
@@ -32,12 +33,10 @@ const COLORS = {
 
 const PRICE_LEVELS = ['₺', '₺₺', '₺₺₺'];
 
+const CATEGORY_ICONS = { Kafe: '☕', Restoran: '🍽️', Bar: '🍹', Etkinlik: '🎉' };
 const CATEGORIES = [
   { name: 'Hepsi', icon: '✨' },
-  { name: 'Kafe', icon: '☕' },
-  { name: 'Restoran', icon: '🍽️' },
-  { name: 'Bar', icon: '🍹' },
-  { name: 'Etkinlik', icon: '🎉' },
+  ...VENUE_CATEGORIES.map((name) => ({ name, icon: CATEGORY_ICONS[name] })),
 ];
 
 const MAP_HEIGHTS = [120, 180, 260];

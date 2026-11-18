@@ -12,12 +12,12 @@ import { WebView } from 'react-native-webview';
 import * as Location from 'expo-location';
 import { getFreshLocation } from './deviceLocation';
 import { supabase } from './supabase';
+import { VENUE_CATEGORIES } from './venueCategories';
 
 // Varsayılan harita merkezi: Köyceğiz, Muğla
 const DEFAULT_LAT = 36.9667;
 const DEFAULT_LNG = 28.6833;
 
-const CATEGORIES = ['Kafe', 'Restoran', 'Bar', 'Etkinlik'];
 const PRICE_LEVELS = ['₺', '₺₺', '₺₺₺'];
 
 // Haritayı gösteren HTML (Leaflet + OpenStreetMap, API key gerektirmez).
@@ -269,7 +269,7 @@ export default function AddVenueScreen({ navigation }) {
 
       <Text style={styles.label}>Kategori</Text>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 15 }}>
-        {CATEGORIES.map((cat) => (
+        {VENUE_CATEGORIES.map((cat) => (
           <TouchableOpacity
             key={cat}
             style={[styles.categoryChip, category === cat && styles.categoryChipActive]}
