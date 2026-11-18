@@ -54,7 +54,9 @@ export function AuthProvider({ children }) {
         const { data, error: profileFailure } = await supabase.rpc('ensure_current_profile');
         if (profileFailure || !data?.[0] || data[0].id !== session.user.id) throw new Error('Profil yüklenemedi. Yeniden dene.');
         if (version !== generation.current) return;
-        setProfile(data[0]);
+        const isApplicationsAdmin = user.app_metadata?.venue_applications_admin === true;
+        setProfile({ ...data[0], isApplicationsAdmin });
+        if (isApplicationsAdmin) return;
         // Notification registration never blocks entry to the app.
         void registerForPushNotificationsAsync(user.id).catch(() => {});
       } catch (failure) { if (version === generation.current) setError(failure.message); }

@@ -38,6 +38,17 @@ export default function PasswordRecoveryScreen({ navigation, route }) {
     setStep('code');
   });
 
+  const enterExistingCode = () => {
+    const address = email.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address)) {
+      setError('Geçerli bir e-posta adresi yaz.');
+      return;
+    }
+    setEmail(address);
+    setError('');
+    setCode('');
+    setStep('code');
+  };
   const verify = () => run(async () => {
     await recovery.verifyCode(email, code);
     setCode('');
@@ -69,6 +80,11 @@ export default function PasswordRecoveryScreen({ navigation, route }) {
               keyboardType="email-address" autoComplete="email" autoCapitalize="none" autoCorrect={false}
               value={email} onChangeText={setEmail} editable={!busy} onSubmitEditing={request} />
           )}
+          {step === 'email' && (
+            <TouchableOpacity accessibilityRole="button" disabled={busy} onPress={enterExistingCode} style={styles.link}>
+              <Text style={styles.linkText}>E-postamda kod var</Text>
+            </TouchableOpacity>
+          )}
           {step === 'code' && <>
             <Text style={styles.description}>Kayıtlı adresine gelen şifre sıfırlama kodunu gir. E-postayı bulamazsan spam klasörüne de bak.</Text>
             <Text style={styles.description}>{email}</Text>
@@ -89,6 +105,11 @@ export default function PasswordRecoveryScreen({ navigation, route }) {
           <TouchableOpacity accessibilityRole="button" disabled={busy} onPress={submit} style={styles.button}>
             {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>{label}</Text>}
           </TouchableOpacity>
+          {step === 'email' && (
+            <TouchableOpacity accessibilityRole="button" disabled={busy} onPress={enterExistingCode} style={styles.link}>
+              <Text style={styles.linkText}>E-postamda kod var</Text>
+            </TouchableOpacity>
+          )}
           {step === 'code' && <>
             <TouchableOpacity accessibilityRole="button" disabled={busy} onPress={request} style={styles.link}>
               <Text style={styles.linkText}>Yeni kod iste</Text>

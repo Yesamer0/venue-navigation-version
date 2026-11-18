@@ -20,12 +20,40 @@ export default function AuthScreen({ navigation }) {
   const [username, setUsername] = useState('');
   const [birthday, setBirthday] = useState('');
   const [businessFields, setBusinessFields] = useState({});
+  const [receipt, setReceipt] = useState('');
+  const [applicationStatus, setApplicationStatus] = useState(null);
   const [isBusinessTypeOpen, setIsBusinessTypeOpen] = useState(false);
   const [email, setEmail] = useState(''); 
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [isRegisterMode, setIsRegisterMode] = useState(false); 
   const [isVenueOwner, setIsVenueOwner] = useState(false);
+
+  const isApplication = isRegisterMode && isVenueOwner;
+  const statusMessages = {
+    pending: 'Başvuru onay bekliyor. Takip kodunu sakla.',
+    changes: 'Eksik bilgi var. İşletme başvuru formunda takip kodunu kullanarak yeniden gönder.',
+    approved: 'Başvuru onaylandı. Hesap kurulum kodu için e-postanı kontrol et.',
+    rejected: 'Başvuru reddedildi.',
+  };
+
+  const checkApplication = async () => {
+    if (lock.current) return;
+    setFormError('');
+    setApplicationStatus(null);
+    if (!/^[0-9a-f-]{36}$/i.test(receipt.trim())) {
+      setFormError('Başvuru takip kodunu kontrol et.');
+      return;
+    }
+    lock.current = true;
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.rpc('get_business_application_status', { p_receipt: receipt.trim() });
+      if (error || !data?.[0]) throw new Error('Başvuru bulunamadı.');
+      setApplicationStatus(data[0]);
+    } catch (failure) { setFormError(failure.message); }
+    finally { lock.current = false; setLoading(false); }
+  };
 
   const handleAuth = async () => {
     if (lock.current) return;
@@ -34,13 +62,28 @@ export default function AuthScreen({ navigation }) {
     let privateBirthday;
     let businessDetails;
     try {
-      input = validateAuthInput({ username, email, password, registering: isRegisterMode });
+      if (isApplication) {
+        const address = email.trim().toLowerCase();
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address)) throw new Error('Geçerli bir e-posta adresi yaz.');
+        input = { email: address };
+      } else {
+        input = validateAuthInput({ username, email, password, registering: isRegisterMode });
+      }
       if (isRegisterMode && !isVenueOwner) privateBirthday = parseBirthday(birthday);
-      if (isRegisterMode && isVenueOwner) businessDetails = validateBusinessSignup(businessFields);
+      if (isApplication) businessDetails = validateBusinessSignup(businessFields);
     }
     catch (failure) { setFormError(failure.message); return; }
     lock.current = true; setLoading(true);
     try {
+      if (isApplication) {
+        const { data, error } = await supabase.rpc('submit_business_application', {
+          p_email: input.email, p_details: businessDetails, p_receipt: receipt.trim() || null,
+        });
+        if (error) throw error;
+        setReceipt(data);
+        setApplicationStatus({ status: 'pending', feedback: '' });
+        return;
+      }
       if (isRegisterMode) {
         const { data: available, error: checkError } = await supabase.rpc('is_username_available', { p_username: input.username });
         if (checkError) throw checkError;
@@ -48,9 +91,7 @@ export default function AuthScreen({ navigation }) {
         const { data, error } = await supabase.auth.signUp({ email: input.email, password: input.password,
           options: { data: {
             username: input.username,
-            is_venue: isVenueOwner,
             ...(privateBirthday ? { birthday: privateBirthday } : {}),
-            ...(businessDetails ? { business_signup: businessDetails } : {}),
           } },
         });
         if (error) throw error;
@@ -63,7 +104,11 @@ export default function AuthScreen({ navigation }) {
         if (error) throw error;
       }
       // The root auth listener selects the authenticated screen and clears old navigation history.
-    } catch (failure) { setFormError(authErrorMessage(failure)); }
+    } catch (failure) {
+      const message = failure?.message;
+      setFormError(message === 'application_rate_limit' ? 'Bu e-posta ile az önce başvuru gönderildi. Takip kodunu kontrol et.' :
+        message === 'application_not_editable' ? 'Bu takip koduyla düzeltme gönderilemiyor.' : authErrorMessage(failure));
+    }
     finally { lock.current = false; setLoading(false); }
   };
 
@@ -94,7 +139,7 @@ export default function AuthScreen({ navigation }) {
           </View>
         )}
 
-        {isRegisterMode && (
+        {isRegisterMode && !isApplication && (
           <TextInput
             style={styles.input}
           editable={!loading}
@@ -120,7 +165,7 @@ export default function AuthScreen({ navigation }) {
           placeholderTextColor="#999"
         />
 
-        <TextInput
+        {!isApplication && <TextInput
           style={styles.input}
           editable={!loading}
           placeholder="Şifre"
@@ -131,7 +176,7 @@ export default function AuthScreen({ navigation }) {
           secureTextEntry
           autoCapitalize="none"
           placeholderTextColor="#999"
-        />
+        />}
 
         {isRegisterMode && isVenueOwner && (
           <View>
@@ -210,9 +255,26 @@ export default function AuthScreen({ navigation }) {
           </View>
         )}
 
+        {(isApplication || !isRegisterMode) && (
+          <View>
+            <Text style={styles.fieldLabel}>Başvuru takip kodu{isApplication ? ' (düzeltme için)' : ''}</Text>
+            <TextInput accessibilityLabel="Başvuru takip kodu" style={styles.input} editable={!loading}
+              autoCapitalize="none" autoCorrect={false} maxLength={36} value={receipt} onChangeText={setReceipt} />
+            <TouchableOpacity accessibilityRole="button" disabled={loading} onPress={checkApplication} style={styles.switchButton}>
+              <Text style={styles.switchText}>Başvuru durumunu gör</Text>
+            </TouchableOpacity>
+            {applicationStatus && (
+              <Text accessibilityLiveRegion="polite" style={styles.fieldLabel}>
+                {statusMessages[applicationStatus.status]}
+                {applicationStatus.feedback ? '\n' + applicationStatus.feedback : ''}
+              </Text>
+            )}
+          </View>
+        )}
+
         {!!formError && <Text accessibilityRole="alert" style={{ color: '#B42318', lineHeight: 21, marginBottom: 12 }}>{formError}</Text>}
         <TouchableOpacity accessibilityRole="button" style={styles.button} onPress={handleAuth} disabled={loading}>
-          {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>{isRegisterMode ? 'Kayıt Ol' : 'Giriş Yap'}</Text>}
+          {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>{isApplication ? 'Başvuru Gönder' : isRegisterMode ? 'Kayıt Ol' : 'Giriş Yap'}</Text>}
         </TouchableOpacity>
 
         {!isRegisterMode && (

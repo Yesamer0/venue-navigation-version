@@ -9,6 +9,7 @@ import * as Notifications from 'expo-notifications';
 
 // Screens
 import AuthScreen from './AuthScreen';
+import BusinessApplicationsScreen from './BusinessApplicationsScreen';
 import PasswordRecoveryScreen from './PasswordRecoveryScreen';
 import MainTabs from './MainTabs';
 import HomeStack from './HomeStack';
@@ -33,14 +34,15 @@ if (Platform.OS !== 'web') {
 function RootNavigator() {
   const { session, profile, loading, error, retry } = useAuth();
   useEffect(() => {
-    if (session?.user?.id && profile) return startPresenceTracking(session.user.id);
-  }, [session?.user?.id, profile?.id]);
+    if (session?.user?.id && profile && !profile.isApplicationsAdmin) return startPresenceTracking(session.user.id);
+  }, [session?.user?.id, profile?.id, profile?.isApplicationsAdmin]);
   if (loading) return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFF0F5' }}><ActivityIndicator color="#C2185B" /><Text style={{ marginTop: 12 }}>Hesabın hazırlanıyor…</Text></View>;
   if (error) return <View style={{ flex: 1, justifyContent: 'center', padding: 28, backgroundColor: '#FFF0F5' }}>
     <Text accessibilityRole="alert" style={{ color: '#9B1B4D', lineHeight: 23 }}>{error}</Text>
     <TouchableOpacity onPress={retry}><Text style={{ color: '#9B1B4D', fontWeight: '700', paddingVertical: 18 }}>Tekrar dene</Text></TouchableOpacity>
     <TouchableOpacity onPress={() => signOutVenue().catch(failure => Alert.alert('Çıkış yapılamadı', failure.message))}><Text style={{ color: '#666', paddingVertical: 12 }}>Çıkış yap</Text></TouchableOpacity>
   </View>;
+  if (session && profile?.isApplicationsAdmin) return <BusinessApplicationsScreen />;
   return <NavigationContainer>
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       {session && profile ? <Stack.Screen name="Main" component={MainTabs} navigationKey={session.user.id} /> : <>

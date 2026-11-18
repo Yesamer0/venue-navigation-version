@@ -436,3 +436,7 @@ verify_jwt = false
 [functions.import-menu]
 # User JWT is validated with auth.getUser inside the handler; RPCs enforce ownership.
 verify_jwt = false
+
+[functions.approve-business-setup]
+# The function verifies the signed-in user and checks the admin claim server-side.
+verify_jwt = false
