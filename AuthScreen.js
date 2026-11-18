@@ -10,6 +10,7 @@ import {
   Platform, KeyboardAvoidingView, ScrollView 
 } from 'react-native';
 import { supabase } from './supabase';
+import { businessSignupFields, validateBusinessSignup } from './businessSignup';
 import { authErrorMessage, parseBirthDate, validateAuthInput } from './authService';
 
 export default function AuthScreen({ navigation }) {
@@ -17,6 +18,7 @@ export default function AuthScreen({ navigation }) {
   const [formError, setFormError] = useState('');
   const [username, setUsername] = useState('');
   const [birthDate, setBirthDate] = useState('');
+  const [businessFields, setBusinessFields] = useState({});
   const [email, setEmail] = useState(''); 
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -28,9 +30,11 @@ export default function AuthScreen({ navigation }) {
     setFormError('');
     let input;
     let privateBirthDate;
+    let businessDetails;
     try {
       input = validateAuthInput({ username, email, password, registering: isRegisterMode });
       if (isRegisterMode && !isVenueOwner) privateBirthDate = parseBirthDate(birthDate);
+      if (isRegisterMode && isVenueOwner) businessDetails = validateBusinessSignup(businessFields);
     }
     catch (failure) { setFormError(failure.message); return; }
     lock.current = true; setLoading(true);
@@ -44,11 +48,12 @@ export default function AuthScreen({ navigation }) {
             username: input.username,
             is_venue: isVenueOwner,
             ...(privateBirthDate ? { birth_date: privateBirthDate } : {}),
+            ...(businessDetails ? { business_signup: businessDetails } : {}),
           } },
         });
         if (error) throw error;
         if (!data?.session) {
-          setIsRegisterMode(false); setPassword(''); setBirthDate('');
+          setIsRegisterMode(false); setPassword(''); setBirthDate(''); setBusinessFields({});
           alert('Hesabını tamamlamak için e-postandaki doğrulama bağlantısını aç, ardından giriş yap.');
         }
       } else {
@@ -126,6 +131,29 @@ export default function AuthScreen({ navigation }) {
           placeholderTextColor="#999"
         />
 
+        {isRegisterMode && isVenueOwner && (
+          <View>
+            <Text style={styles.sectionTitle}>Şirket ve vergi kaydı</Text>
+            {businessSignupFields.map(({ key, label, keyboardType, maxLength }) => (
+              <View key={key}>
+                <Text style={styles.fieldLabel}>{label}</Text>
+                <TextInput
+                  accessibilityLabel={label}
+                  style={styles.input}
+                  editable={!loading}
+                  keyboardType={keyboardType}
+                  maxLength={maxLength}
+                  value={businessFields[key] || ''}
+                  onChangeText={(value) => setBusinessFields((previous) => ({ ...previous, [key]: value }))}
+                />
+              </View>
+            ))}
+            <Text style={{ color: '#555', marginBottom: 12 }}>
+              İlk mekânını işletme panelinden eklerken adresini kullanıp haritada konumu seçebilirsin.
+            </Text>
+          </View>
+        )}
+
         {isRegisterMode && !isVenueOwner && (
           <View>
             <Text style={{ color: '#555', marginBottom: 6 }}>Doğum tarihi (isteğe bağlı)</Text>
@@ -175,6 +203,8 @@ const styles = StyleSheet.create({
   title: { fontSize: 36, fontWeight: 'bold', color: palette.accent, textAlign: 'center', marginBottom: 5 },
   subtitle: { fontSize: 14, color: '#888', textAlign: 'center', marginBottom: 25 },
   input: { height: 50, borderWidth: 1, borderColor: palette.border, borderRadius: 10, paddingHorizontal: 15, marginBottom: 15, fontSize: 16, backgroundColor: '#FAFAFA', color: '#333' },
+  sectionTitle: { color: '#333', fontSize: 16, fontWeight: '600', marginBottom: 12 },
+  fieldLabel: { color: '#555', marginBottom: 6 },
   checkboxRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FAFAFA', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: palette.border, marginBottom: 15 },
   checkboxRowActive: { borderColor: palette.accent, backgroundColor: palette.canvas },
   checkboxCircle: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: palette.accent, marginRight: 10 },

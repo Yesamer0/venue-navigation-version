@@ -253,13 +253,19 @@ export default function AddVenueScreen({ navigation }) {
       <Text style={styles.title}>Yeni Mekan Ekle 🏢</Text>
 
       {/* Temel Bilgiler */}
-      <Text style={styles.label}>Mekan Adı</Text>
+      <Text style={styles.label}>Tabela adı</Text>
       <TextInput
         style={styles.input}
         placeholder="Örn: Luna Cafe"
         value={name}
         onChangeText={setName}
       />
+
+      {!!currentUser?.user_metadata?.business_signup?.address && (
+        <Text style={styles.label}>
+          Kayıtta girilen ilk mekân adresi: {currentUser.user_metadata.business_signup.address}
+        </Text>
+      )}
 
       <Text style={styles.label}>Kategori</Text>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 15 }}>
